@@ -50,8 +50,20 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', ({ roomId, playerName, avatar, playerId }) => {
     const code = (roomId || '').trim().toUpperCase();
-    let room = roomManager.getRoom(code);
 
+    // Leave previous room if switching rooms
+    if (currentRoomId && currentRoomId !== code) {
+      const prevRoom = roomManager.getRoom(currentRoomId);
+      if (prevRoom && currentPlayerId) {
+        prevRoom.removePlayer(currentPlayerId);
+        socket.leave(currentRoomId);
+        if (prevRoom.state.players.length === 0 || prevRoom.state.players.every(p => p.isBot || !p.connected)) {
+          roomManager.deleteRoom(currentRoomId);
+        }
+      }
+    }
+
+    let room = roomManager.getRoom(code);
     if (!room) {
       // Auto-create room if it doesn't exist so users can easily join any 4-letter code!
       room = roomManager.createRoom(`Meja ${code}`, { fillWithBots: true }, code);
@@ -78,6 +90,23 @@ io.on('connection', (socket) => {
     });
 
     room.broadcastState();
+  });
+
+  socket.on('leave_room', ({ roomId, playerId }) => {
+    const code = (roomId || currentRoomId || '').toUpperCase();
+    const room = roomManager.getRoom(code);
+    const pid = playerId || currentPlayerId;
+    if (room && pid) {
+      room.removePlayer(pid);
+      socket.leave(code);
+      if (code === currentRoomId) {
+        currentRoomId = null;
+        currentPlayerId = null;
+      }
+      if (room.state.players.length === 0 || room.state.players.every(p => p.isBot || !p.connected)) {
+        roomManager.deleteRoom(code);
+      }
+    }
   });
 
   socket.on('start_game', ({ roomId }) => {
@@ -143,6 +172,9 @@ io.on('connection', (socket) => {
       const room = roomManager.getRoom(currentRoomId);
       if (room) {
         room.removePlayer(currentPlayerId);
+        if (room.state.players.length === 0 || room.state.players.every(p => p.isBot || !p.connected)) {
+          roomManager.deleteRoom(currentRoomId);
+        }
       }
     }
   });

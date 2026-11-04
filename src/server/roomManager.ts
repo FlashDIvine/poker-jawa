@@ -63,6 +63,28 @@ export class Room {
     }
 
     if (this.state.players.length >= 4) {
+      if (this.state.status === 'waiting') {
+        const botIdx = this.state.players.findIndex(p => p.isBot);
+        if (botIdx !== -1) {
+          const newPlayer: Player = {
+            id,
+            name: name || `Pemain ${botIdx + 1}`,
+            avatar: avatar || '👤',
+            isBot: false,
+            hand: [],
+            cardCount: 0,
+            passed: false,
+            connected: true,
+            isHost: false,
+            seatIndex: botIdx,
+            score: 0
+          };
+          this.state.players[botIdx] = newPlayer;
+          this.broadcastSystemChat(`${newPlayer.name} telah bergabung ke meja (menggantikan Bot).`);
+          this.broadcastState();
+          return newPlayer;
+        }
+      }
       return null; // Room full
     }
 
@@ -162,6 +184,10 @@ export class Room {
     const starterIdx = findPlayerWithThreeSpades(hands);
     const starter = this.state.players[starterIdx];
 
+    if (this.state.results) {
+      this.state.roundNumber++;
+    }
+
     this.state.status = 'playing';
     this.state.currentTurnPlayerId = starter.id;
     this.state.leadPlayerId = starter.id;
@@ -222,12 +248,9 @@ export class Room {
 
     this.state.lastPlay = playedTrick;
     this.state.trickHistory.push(playedTrick);
-    this.state.consecutivePasses = 0;
     this.state.isFirstTurnOfGame = false;
     this.state.leadPlayerId = player.id;
-
-    // Reset passed status for everyone when a valid play is made
-    this.state.players.forEach(p => (p.passed = false));
+    player.passed = false;
 
     // Announce the play
     this.broadcastSystemChat(`${player.name} mengeluarkan: ${validation.combo.description}`);
@@ -235,6 +258,22 @@ export class Room {
     // Check if player won!
     if (player.hand.length === 0) {
       this.handleGameOver(player);
+      return { success: true };
+    }
+
+    // Check if all other players had already passed earlier in this trick
+    const activeOpponents = this.state.players.filter(p => p.id !== player.id && !p.passed);
+    if (activeOpponents.length === 0) {
+      this.broadcastSystemChat(`Semua lawan telah lewat! ${player.name} memenangkan putaran dan memimpin babak baru.`);
+      this.state.lastPlay = null;
+      this.state.trickHistory = [];
+      this.state.consecutivePasses = 0;
+      this.state.players.forEach(p => (p.passed = false));
+      this.state.currentTurnPlayerId = player.id;
+      this.state.leadPlayerId = player.id;
+      this.startTurnTimer();
+      this.broadcastState();
+      this.triggerBotTurnIfNeeded();
       return { success: true };
     }
 
@@ -264,11 +303,13 @@ export class Room {
     if (!player) return { success: false, error: 'Pemain tidak ditemukan.' };
 
     player.passed = true;
-    this.state.consecutivePasses++;
     this.broadcastSystemChat(`${player.name} memilih Lewat (Pass).`);
 
-    // If 3 consecutive passes, trick is over!
-    if (this.state.consecutivePasses >= 3) {
+    const passedCount = this.state.players.filter(p => p.passed).length;
+    this.state.consecutivePasses = passedCount;
+
+    // If 3 players have passed, trick is over!
+    if (passedCount >= 3) {
       const winner = this.getPlayer(this.state.leadPlayerId || '') || player;
       this.broadcastSystemChat(`Semua pemain lewat! ${winner.name} memenangkan putaran dan memimpin babak baru.`);
       this.state.lastPlay = null;
@@ -278,6 +319,7 @@ export class Room {
 
       // Trick winner gets the next turn!
       this.state.currentTurnPlayerId = winner.id;
+      this.state.leadPlayerId = winner.id;
       this.startTurnTimer();
       this.broadcastState();
       this.triggerBotTurnIfNeeded();
@@ -291,6 +333,9 @@ export class Room {
   private advanceTurn(): void {
     const currentIdx = this.state.players.findIndex(p => p.id === this.state.currentTurnPlayerId);
     let nextIdx = (currentIdx + 1) % 4;
+    while (this.state.players[nextIdx].passed) {
+      nextIdx = (nextIdx + 1) % 4;
+    }
 
     this.state.currentTurnPlayerId = this.state.players[nextIdx].id;
     this.startTurnTimer();
@@ -402,7 +447,8 @@ export class Room {
       if (hasPoker) {
         penalty *= 2; // Capsa banting rule: caught holding Poker doubles penalty!
       }
-      p.score -= penalty;
+      const scoreDelta = p.id === winner.id ? +30 : -penalty;
+      p.score += scoreDelta;
 
       return {
         playerId: p.id,
@@ -411,7 +457,7 @@ export class Room {
         isBot: p.isBot,
         rank: p.id === winner.id ? 1 : 2, // will be sorted
         remainingCards: p.hand.length,
-        scoreDelta: p.id === winner.id ? +30 : -penalty,
+        scoreDelta,
         isWinner: p.id === winner.id
       };
     });
@@ -436,11 +482,14 @@ export class Room {
     const player = this.getPlayer(senderId);
     if (!player) return null;
 
+    const cleanText = (text || '').trim().substring(0, 150);
+    if (!cleanText) return null;
+
     const message: ChatMessage = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       senderId: player.id,
       senderName: player.name,
-      text: text.trim().substring(0, 150),
+      text: cleanText,
       isSystem: false,
       timestamp: Date.now()
     };

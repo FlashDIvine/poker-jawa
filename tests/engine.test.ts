@@ -207,6 +207,33 @@ describe('Engine - canBeat rules', () => {
     expect(canBeat(fhSevens, fhEights)).toBe(true);
     expect(canBeat(fhEights, fhSevens)).toBe(false);
   });
+
+  it('Bong cannot counter Ace, Tris, or Full House (Bong only counters Poker 2 or lower Bong)', () => {
+    const asHearts = evaluateCombo([makeCard(14, 'H')])!;
+    const trisNines = evaluateCombo([makeCard(9, 'S'), makeCard(9, 'C'), makeCard(9, 'D')])!;
+    const fullHouseFives = evaluateCombo([
+      makeCard(5, 'S'), makeCard(5, 'C'), makeCard(5, 'D'),
+      makeCard(3, 'S'), makeCard(3, 'C')
+    ])!;
+    const bongTens = evaluateCombo([
+      makeCard(10, 'S'), makeCard(10, 'C'), makeCard(10, 'D'), makeCard(10, 'H')
+    ])!;
+    const bongSF = evaluateCombo([
+      makeCard(7, 'S'), makeCard(8, 'S'), makeCard(9, 'S'), makeCard(10, 'S')
+    ])!;
+
+    // Bong cannot cut Ace (only higher Ace, Poker 2, Tris, or Full House can cut Ace)
+    expect(canBeat(asHearts, bongTens)).toBe(false);
+    expect(canBeat(asHearts, bongSF)).toBe(false);
+
+    // Bong cannot bomb Tris (only higher Tris can beat Tris)
+    expect(canBeat(trisNines, bongTens)).toBe(false);
+    expect(canBeat(trisNines, bongSF)).toBe(false);
+
+    // Bong cannot bomb Full House (only higher Full House can beat Full House)
+    expect(canBeat(fullHouseFives, bongTens)).toBe(false);
+    expect(canBeat(fullHouseFives, bongSF)).toBe(false);
+  });
 });
 
 describe('Engine - validatePlay & Opening Lead rule', () => {

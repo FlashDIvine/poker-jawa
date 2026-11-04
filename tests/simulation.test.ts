@@ -3,9 +3,10 @@ import { createDeck, shuffleDeck, dealDeck, findPlayerWithThreeSpades } from '..
 import { decideBotMove } from '../src/shared/bot.js';
 import { validatePlay, evaluateCombo } from '../src/shared/engine.js';
 import { PlayedTrick } from '../src/shared/types.js';
+import { Room } from '../src/server/roomManager.js';
 
 describe('End-to-End Game Simulation', () => {
-  it('successfully simulates 30 full 4-player games without deadlocks or rule violations', () => {
+  it('successfully simulates 30 full 4-player games with accurate pass skipping and trick lifecycle', () => {
     const NUM_GAMES = 30;
 
     for (let g = 0; g < NUM_GAMES; g++) {
@@ -18,7 +19,8 @@ describe('End-to-End Game Simulation', () => {
 
       let isFirstTurnOfGame = true;
       let lastPlay: PlayedTrick | null = null;
-      let consecutivePasses = 0;
+      let leadPlayer = currentTurn;
+      const passed = [false, false, false, false];
       let winner = -1;
       let turnCount = 0;
       const MAX_TURNS = 300;
@@ -44,7 +46,8 @@ describe('End-to-End Game Simulation', () => {
             timestamp: Date.now()
           };
 
-          consecutivePasses = 0;
+          leadPlayer = currentTurn;
+          passed[currentTurn] = false;
           isFirstTurnOfGame = false;
 
           // Check for win
@@ -52,28 +55,82 @@ describe('End-to-End Game Simulation', () => {
             winner = currentTurn;
             break;
           }
-        } else {
-          // Bot chose to pass (Lewat)
-          expect(isFirstTurnOfGame, 'Opening player cannot pass on first turn').toBe(false);
-          consecutivePasses++;
 
-          // If all 3 opponents passed, the last player who played gets a new lead
-          if (consecutivePasses === 3) {
+          // Check if all other players had already passed earlier in this trick
+          const activeOpponents = [0, 1, 2, 3].filter(idx => idx !== currentTurn && !passed[idx]);
+          if (activeOpponents.length === 0) {
             lastPlay = null;
-            consecutivePasses = 0;
-            // The turn automatically stays or goes to trick winner
-            // In standard play, the last player who played leads next
-            // That player will be next if we proceed clockwise:
-            // Since there were 3 passes, the next player IS the trick winner!
+            for (let i = 0; i < 4; i++) passed[i] = false;
+            // Current player retains lead
+            continue;
+          }
+
+          // Advance to next active player
+          let next = (currentTurn + 1) % 4;
+          while (passed[next]) {
+            next = (next + 1) % 4;
+          }
+          currentTurn = next;
+        } else {
+          // Player chose to pass (Lewat)
+          expect(isFirstTurnOfGame, 'Opening player cannot pass on first turn').toBe(false);
+          passed[currentTurn] = true;
+
+          const passedCount = passed.filter(p => p).length;
+          if (passedCount >= 3) {
+            // Trick over! Lead player gets a clean table
+            lastPlay = null;
+            for (let i = 0; i < 4; i++) passed[i] = false;
+            currentTurn = leadPlayer;
+          } else {
+            // Advance to next active player
+            let next = (currentTurn + 1) % 4;
+            while (passed[next]) {
+              next = (next + 1) % 4;
+            }
+            currentTurn = next;
           }
         }
-
-        // Clockwise turn order: (currentTurn + 1) % 4
-        currentTurn = (currentTurn + 1) % 4;
       }
 
       expect(winner, `Game ${g} did not complete within ${MAX_TURNS} turns`).toBeGreaterThanOrEqual(0);
       expect(hands[winner].length).toBe(0);
     }
+  });
+
+  it('runs complete games through the actual server Room class directly', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('SIM1', 'Simulation Room', mockIo, { fillWithBots: true, turnTimerSeconds: 15 });
+    room.addPlayer('p0', 'Player 0');
+    expect(room.startGame()).toBe(true);
+    expect(room.state.status).toBe('playing');
+    expect(room.state.players).toHaveLength(4);
+
+    let turns = 0;
+    while (room.state.status === 'playing' && turns < 250) {
+      turns++;
+      const currentPid = room.state.currentTurnPlayerId!;
+      const currentPlayer = room.getPlayer(currentPid)!;
+      const move = decideBotMove(currentPlayer.hand, room.state.lastPlay, room.state.isFirstTurnOfGame);
+
+      if (move && move.length > 0) {
+        const res = room.playCards(currentPid, move.map(c => c.id));
+        expect(res.success).toBe(true);
+      } else {
+        const res = room.passTurn(currentPid);
+        expect(res.success).toBe(true);
+      }
+    }
+
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.winnerId).toBeDefined();
+    expect(room.state.results).toHaveLength(4);
+    const winnerResult = room.state.results?.find(r => r.isWinner);
+    expect(winnerResult).toBeDefined();
+    expect(winnerResult?.scoreDelta).toBe(30);
   });
 });

@@ -3,7 +3,7 @@ import http from 'http';
 import express from 'express';
 import { Server } from 'socket.io';
 import { io as ClientSocket, Socket as ClientSocketType } from 'socket.io-client';
-import { RoomManager } from '../src/server/roomManager.js';
+import { Room, RoomManager } from '../src/server/roomManager.js';
 
 describe('Server & WebSocket Integration', () => {
   let server: http.Server;
@@ -32,17 +32,46 @@ describe('Server & WebSocket Integration', () => {
 
       socket.on('join_room', ({ roomId, playerName, avatar, playerId }) => {
         const code = (roomId || '').trim().toUpperCase();
+        if (currentRoomId && currentRoomId !== code) {
+          const prevRoom = roomManager.getRoom(currentRoomId);
+          if (prevRoom && currentPlayerId) {
+            prevRoom.removePlayer(currentPlayerId);
+            socket.leave(currentRoomId);
+            if (prevRoom.state.players.length === 0 || prevRoom.state.players.every(p => p.isBot || !p.connected)) {
+              roomManager.deleteRoom(currentRoomId);
+            }
+          }
+        }
+
         let room = roomManager.getRoom(code);
         if (!room) {
           room = roomManager.createRoom(`Meja ${code}`, { fillWithBots: true }, code);
         }
         const validPid = playerId || `p_${socket.id}`;
+        currentRoomId = code;
         currentPlayerId = validPid;
         (socket as any).playerId = validPid;
         socket.join(code);
         const player = room.addPlayer(validPid, playerName, avatar);
         socket.emit('joined_room', { playerId: currentPlayerId, player });
         room.broadcastState();
+      });
+
+      socket.on('leave_room', ({ roomId, playerId }) => {
+        const code = (roomId || currentRoomId || '').toUpperCase();
+        const room = roomManager.getRoom(code);
+        const pid = playerId || currentPlayerId;
+        if (room && pid) {
+          room.removePlayer(pid);
+          socket.leave(code);
+          if (code === currentRoomId) {
+            currentRoomId = null;
+            currentPlayerId = null;
+          }
+          if (room.state.players.length === 0 || room.state.players.every(p => p.isBot || !p.connected)) {
+            roomManager.deleteRoom(code);
+          }
+        }
       });
 
       socket.on('start_game', ({ roomId }) => {
@@ -139,5 +168,115 @@ describe('Server & WebSocket Integration', () => {
     // Starter must be identified and first turn set
     expect(playingState.currentTurnPlayerId).toBeDefined();
     expect(playingState.isFirstTurnOfGame).toBe(true);
+  });
+
+  it('leave_room removes the player and cleans up empty room', async () => {
+    const tempRoomCode = 'TEMP';
+    clientSocket.emit('join_room', {
+      roomId: tempRoomCode,
+      playerName: 'Temporary',
+      playerId: 'temp_p1'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(roomManager.getRoom(tempRoomCode)).toBeDefined();
+
+    // Leave room
+    clientSocket.emit('leave_room', { roomId: tempRoomCode, playerId: 'temp_p1' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Room should have been cleaned up because 0 human players remain
+    expect(roomManager.getRoom(tempRoomCode)).toBeUndefined();
+  });
+
+  it('replaces bot when human player joins a waiting room with existing bots', () => {
+    const room = roomManager.createRoom('Bot Meja', { fillWithBots: true }, 'BOTS');
+    room.addPlayer('host1', 'Host 1');
+    room.startGame(); // fills with 3 bots (total 4)
+    room.resetForNextGame(); // status is waiting, still 4 players (1 human + 3 bots)
+
+    expect(room.state.status).toBe('waiting');
+    expect(room.state.players).toHaveLength(4);
+    expect(room.state.players.filter(p => p.isBot)).toHaveLength(3);
+
+    // Human player 2 joins
+    const human2 = room.addPlayer('human2', 'Player Two');
+    expect(human2).not.toBeNull();
+    expect(room.state.players.filter(p => !p.isBot)).toHaveLength(2);
+    expect(room.state.players.filter(p => p.isBot)).toHaveLength(2);
+
+    roomManager.deleteRoom('BOTS');
+  });
+
+  it('enforces that passed players are skipped and trick ends when all other players pass', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('PASS', 'Pass Test', mockIo, { fillWithBots: false });
+    room.addPlayer('p0', 'Player 0');
+    room.addPlayer('p1', 'Player 1');
+    room.addPlayer('p2', 'Player 2');
+    room.addPlayer('p3', 'Player 3');
+
+    // Give manually crafted hands with multiple cards so players do not empty hand immediately
+    room.state.status = 'playing';
+    room.state.isFirstTurnOfGame = false;
+    room.state.players[0].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: 'KS', rank: 13, suit: 'S', suitValue: 1, rankLabel: 'K', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[1].hand = [
+      { id: '5S', rank: 5, suit: 'S', suitValue: 1, rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: 'AS', rank: 14, suit: 'S', suitValue: 1, rankLabel: 'As', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: true, isThreeSpades: false }
+    ];
+    room.state.players[2].hand = [
+      { id: '8S', rank: 8, suit: 'S', suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[3].hand = [
+      { id: '9S', rank: 9, suit: 'S', suitValue: 1, rankLabel: '9', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '2H', rank: 15, suit: 'H', suitValue: 4, rankLabel: '2', suitSymbol: '♥', suitName: 'Hati', color: 'red', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+
+    room.state.currentTurnPlayerId = 'p0';
+    room.state.leadPlayerId = 'p0';
+    room.state.lastPlay = null;
+
+    // 1. P0 leads 4S
+    const play1 = room.playCards('p0', ['4S']);
+    expect(play1.success).toBe(true);
+    expect(room.state.currentTurnPlayerId).toBe('p1');
+
+    // 2. P1 passes (P1.passed = true)
+    const pass1 = room.passTurn('p1');
+    expect(pass1.success).toBe(true);
+    expect(room.state.players[1].passed).toBe(true);
+    expect(room.state.currentTurnPlayerId).toBe('p2');
+
+    // 3. P2 plays 8S
+    const play2 = room.playCards('p2', ['8S']);
+    expect(play2.success).toBe(true);
+    expect(room.state.players[1].passed).toBe(true); // P1 remains passed!
+    expect(room.state.leadPlayerId).toBe('p2');
+    expect(room.state.currentTurnPlayerId).toBe('p3');
+
+    // 4. P3 passes (P3.passed = true)
+    const pass2 = room.passTurn('p3');
+    expect(pass2.success).toBe(true);
+    expect(room.state.players[3].passed).toBe(true);
+    // P1 was already passed, so turn should skip P1 and go directly to P0!
+    expect(room.state.currentTurnPlayerId).toBe('p0');
+
+    // 5. P0 passes
+    // Now P1 passed, P3 passed, P0 passed -> all 3 opponents have passed!
+    const pass3 = room.passTurn('p0');
+    expect(pass3.success).toBe(true);
+
+    // Trick must end! P2 wins trick!
+    expect(room.state.lastPlay).toBeNull(); // clean table
+    expect(room.state.currentTurnPlayerId).toBe('p2'); // P2 leads new round
+    expect(room.state.players.every(p => !p.passed)).toBe(true); // all passed flags reset
   });
 });

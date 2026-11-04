@@ -181,7 +181,7 @@ export function canBeat(leadCombo: HandCombo, challengeCombo: HandCombo): boolea
     if (leadCombo.mainRank === 14) {
       if (challengeCombo.type === 'TRIS') return true;
       if (challengeCombo.type === 'FULL_HOUSE') return true;
-      if (challengeCombo.type === 'BONG_FOUR' || challengeCombo.type === 'BONG_SF') return true;
+      // Note: Higher As and Poker 2 are covered in Single vs Single above
     }
 
     // Special Counter Rule: Table has Single Poker (2, rank 15)
@@ -216,8 +216,6 @@ export function canBeat(leadCombo: HandCombo, challengeCombo: HandCombo): boolea
     if (challengeCombo.type === 'TRIS') {
       return challengeCombo.mainRank > leadCombo.mainRank;
     }
-    // Bong can bomb a Tris
-    if (challengeCombo.type === 'BONG_FOUR' || challengeCombo.type === 'BONG_SF') return true;
     return false;
   }
 
@@ -227,8 +225,6 @@ export function canBeat(leadCombo: HandCombo, challengeCombo: HandCombo): boolea
     if (challengeCombo.type === 'FULL_HOUSE') {
       return challengeCombo.mainRank > leadCombo.mainRank;
     }
-    // Bong can bomb a Full House
-    if (challengeCombo.type === 'BONG_FOUR' || challengeCombo.type === 'BONG_SF') return true;
     return false;
   }
 

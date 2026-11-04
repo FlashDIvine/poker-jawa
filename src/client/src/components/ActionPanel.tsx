@@ -8,6 +8,7 @@ interface ActionPanelProps {
   hand: Card[];
   selectedCardIds: string[];
   onToggleCard: (cardId: string) => void;
+  onSelectCards: (cardIds: string[]) => void;
   onClearSelection: () => void;
   onPlaySelected: () => void;
   onPass: () => void;
@@ -22,6 +23,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   hand,
   selectedCardIds,
   onToggleCard,
+  onSelectCards,
   onClearSelection,
   onPlaySelected,
   onPass,
@@ -42,8 +44,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const handleAutoHint = () => {
     const suggested = decideBotMove(hand, lastPlay, isFirstTurnOfGame);
     if (suggested && suggested.length > 0) {
-      onClearSelection();
-      suggested.forEach(c => onToggleCard(c.id));
+      onSelectCards(suggested.map(c => c.id));
     }
   };
 

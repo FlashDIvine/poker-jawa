@@ -62,6 +62,11 @@ export const PokerTable: React.FC<PokerTableProps> = ({
     if (errorMessage) onClearError();
   };
 
+  const handleSelectCards = (cardIds: string[]) => {
+    setSelectedCardIds(cardIds);
+    if (errorMessage) onClearError();
+  };
+
   const handleClearSelection = () => {
     setSelectedCardIds([]);
     if (errorMessage) onClearError();
@@ -255,6 +260,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
             hand={sortedHand}
             selectedCardIds={selectedCardIds}
             onToggleCard={handleToggleCard}
+            onSelectCards={handleSelectCards}
             onClearSelection={handleClearSelection}
             onPlaySelected={handlePlaySelected}
             onPass={handlePass}
