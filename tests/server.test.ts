@@ -36,11 +36,11 @@ describe('Server & WebSocket Integration', () => {
         if (!room) {
           room = roomManager.createRoom(`Meja ${code}`, { fillWithBots: true }, code);
         }
-        currentRoomId = code;
-        currentPlayerId = playerId || `p_${socket.id}`;
-        (socket as any).playerId = currentPlayerId;
+        const validPid = playerId || `p_${socket.id}`;
+        currentPlayerId = validPid;
+        (socket as any).playerId = validPid;
         socket.join(code);
-        const player = room.addPlayer(currentPlayerId, playerName, avatar);
+        const player = room.addPlayer(validPid, playerName, avatar);
         socket.emit('joined_room', { playerId: currentPlayerId, player });
         room.broadcastState();
       });
