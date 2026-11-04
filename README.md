@@ -79,7 +79,7 @@ Buka browser di `http://localhost:3001`.
 ---
 
 ## 🧪 Menjalankan Tes
-Proyek ini dilengkapi dengan 29 tes menyeluruh mencakup seluruh aturan kartu dan simulasi permainan:
+Proyek ini dilengkapi dengan 34 tes menyeluruh mencakup seluruh aturan kartu dan simulasi permainan:
 ```bash
 npm test
 ```
