@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { GameState, ChatMessage, Card } from '@shared/types.js';
+import { GameState, ChatMessage, Card, GameRules, DEFAULT_RULES } from '@shared/types.js';
 import { Lobby } from './components/Lobby.js';
 import { PokerTable } from './components/PokerTable.js';
 import { GameOverModal } from './components/GameOverModal.js';
 import { RulesModal } from './components/RulesModal.js';
 import { ChatBox } from './components/ChatBox.js';
+import { RotateDevicePrompt } from './components/RotateDevicePrompt.js';
 import { sounds } from './audio/soundEffects.js';
 
 export const App: React.FC = () => {
@@ -21,6 +22,10 @@ export const App: React.FC = () => {
 
   const prevLastPlayRef = useRef<any>(null);
   const prevStatusRef = useRef<string>('waiting');
+  const prevTurnPlayerRef = useRef<string | null>(null);
+  const prevPassedMapRef = useRef<Record<string, boolean>>({});
+  const playerIdRef = useRef<string>('');
+  const selfJustPassedRef = useRef<boolean>(false);
 
   // Initialize player identity from localStorage
   useEffect(() => {
@@ -30,6 +35,7 @@ export const App: React.FC = () => {
       localStorage.setItem('poker_remi_player_id', savedId);
     }
     setPlayerId(savedId);
+    playerIdRef.current = savedId;
 
     const savedName = localStorage.getItem('poker_remi_player_name');
     setPlayerName(savedName || `Pemain_${savedId.substring(2, 6)}`);
@@ -68,28 +74,77 @@ export const App: React.FC = () => {
       if (prevStatusRef.current !== 'playing' && state.status === 'playing') {
         sounds.playDeal();
       }
+
+      // Audio trigger on game over
+      if (prevStatusRef.current === 'playing' && state.status === 'game_over') {
+        sounds.playWinFanfare();
+      }
       prevStatusRef.current = state.status;
 
       // Audio trigger on card plays
       if (state.lastPlay && state.lastPlay.timestamp !== prevLastPlayRef.current?.timestamp) {
         const combo = state.lastPlay.combo;
-        const isBongOrPoker =
+        if (combo.type === 'TRIS') {
+          sounds.playTrisSound();
+        } else if (
           combo.type === 'BONG_FOUR' ||
           combo.type === 'BONG_SF' ||
-          combo.cards.some((c: Card) => c.isPoker);
-
-        if (isBongOrPoker) {
+          combo.type === 'FULL_HOUSE' ||
+          combo.cards.some((c: Card) => c.isPoker)
+        ) {
           sounds.playBantingSlam();
         } else {
           sounds.playCardSnap();
         }
       }
+
+      // Audio trigger on trick won / table sweep
+      if (prevLastPlayRef.current && !state.lastPlay && state.status === 'playing') {
+        sounds.playTrickWon();
+      }
       prevLastPlayRef.current = state.lastPlay;
+
+      // Audio trigger on player passing
+      if (state.status === 'playing') {
+        const myPid = playerIdRef.current;
+        const newlyPassedOther = state.players.some(
+          p => p.id !== myPid && p.passed && !prevPassedMapRef.current[p.id]
+        );
+        const newlyPassedSelf = state.players.some(
+          p => p.id === myPid && p.passed && !prevPassedMapRef.current[p.id]
+        );
+
+        if (newlyPassedOther) {
+          sounds.playPass();
+        } else if (newlyPassedSelf && !selfJustPassedRef.current) {
+          sounds.playPass();
+        }
+        selfJustPassedRef.current = false;
+
+        const updatedMap: Record<string, boolean> = {};
+        state.players.forEach(p => { if (p.passed) updatedMap[p.id] = true; });
+        prevPassedMapRef.current = updatedMap;
+      }
+
+      // Audio trigger on turn changed to self
+      const myPid = playerIdRef.current;
+      if (
+        state.status === 'playing' &&
+        state.currentTurnPlayerId &&
+        state.currentTurnPlayerId === myPid &&
+        prevTurnPlayerRef.current !== myPid
+      ) {
+        sounds.playTurnAlert();
+      }
+      prevTurnPlayerRef.current = state.currentTurnPlayerId;
 
       setGameState(state);
     });
 
     newSocket.on('turn_tick', ({ timeRemaining, playerId: currentPid }) => {
+      if (currentPid === playerIdRef.current && timeRemaining <= 5 && timeRemaining > 0) {
+        sounds.playTimerWarning();
+      }
       setGameState((prev) => {
         if (!prev) return null;
         return {
@@ -102,12 +157,10 @@ export const App: React.FC = () => {
 
     newSocket.on('chat_message', (msg: ChatMessage) => {
       setChatMessages((prev) => [...prev, msg]);
-      if (msg.isSystem && msg.text.includes('Lewat')) {
-        sounds.playPass();
-      }
     });
 
     newSocket.on('error_message', (err: string) => {
+      sounds.playError();
       setErrorMessage(err);
       setTimeout(() => setErrorMessage(null), 4000);
     });
@@ -120,13 +173,19 @@ export const App: React.FC = () => {
   }, []);
 
   // Room Actions
-  const handleCreateRoom = async (roomName: string, fillWithBots: boolean, turnTimerSeconds: number) => {
+  const handleCreateRoom = async (
+    roomName: string,
+    fillWithBots: boolean,
+    turnTimerSeconds: number,
+    maxPlayers: number = 4,
+    rules: GameRules = DEFAULT_RULES
+  ) => {
     if (!socket) return;
     try {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomName, fillWithBots, turnTimerSeconds })
+        body: JSON.stringify({ roomName, fillWithBots, turnTimerSeconds, maxPlayers, rules })
       });
       if (res.ok) {
         const data = await res.json();
@@ -168,6 +227,7 @@ export const App: React.FC = () => {
 
   const handlePassTurn = () => {
     if (!socket || !gameState) return;
+    selfJustPassedRef.current = true;
     socket.emit('pass_turn', {
       roomId: gameState.roomId,
       playerId
@@ -247,6 +307,9 @@ export const App: React.FC = () => {
 
       {/* Rules Modal */}
       <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
+
+      {/* Mobile Landscape Orientation Enforcement Modal */}
+      <RotateDevicePrompt />
     </div>
   );
 };

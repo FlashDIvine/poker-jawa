@@ -1,7 +1,7 @@
 {
-  "name": "poker-remi",
+  "name": "poker-jawa",
   "version": "1.0.0",
-  "description": "Indonesian Poker Remi / Capsa Banting Real-time Multiplayer Web Game",
+  "description": "Poker Jawa (Capsa Banting / Poker Remi Indonesia) Real-time Multiplayer Web Game",
   "main": "src/server/server.ts",
   "type": "module",
   "scripts": {
@@ -14,6 +14,7 @@
   },
   "keywords": [
     "poker",
+    "poker-jawa",
     "remi",
     "capsa-banting",
     "multiplayer",
@@ -21,8 +22,8 @@
     "socket.io",
     "react"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "FlashDIvine",
+  "license": "AGPL-3.0-or-later",
   "dependencies": {
     "canvas-confetti": "^1.9.4",
     "cors": "^2.8.6",

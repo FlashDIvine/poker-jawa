@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateCombo, canBeat, validatePlay } from '../src/shared/engine.js';
-import { Card } from '../src/shared/types.js';
+import { Card, DEFAULT_RULES } from '../src/shared/types.js';
 
 function makeCard(rank: number, suit: 'S' | 'C' | 'D' | 'H'): Card {
   const suitMap = {
@@ -119,25 +119,38 @@ describe('Engine - canBeat rules', () => {
     expect(canBeat(fourSpades, threeSpades)).toBe(false);
   });
 
-  it('same rank single is decided by suit: Waru (S) < Keriting (C) < Wajik (D) < Hati (H)', () => {
-    const asSpades = evaluateCombo([makeCard(14, 'S')])!;
-    const asClubs = evaluateCombo([makeCard(14, 'C')])!;
-    const asDiamonds = evaluateCombo([makeCard(14, 'D')])!;
-    const asHearts = evaluateCombo([makeCard(14, 'H')])!;
+  it('cards of same rank cannot beat each other (ga boleh tabrak kartu yang sama, misal 8 tidak boleh ditabrak 8)', () => {
+    const eightSpades = evaluateCombo([makeCard(8, 'S')])!;
+    const eightHearts = evaluateCombo([makeCard(8, 'H')])!;
+    const nineSpades = evaluateCombo([makeCard(9, 'S')])!;
 
-    expect(canBeat(asSpades, asClubs)).toBe(true);
-    expect(canBeat(asClubs, asDiamonds)).toBe(true);
-    expect(canBeat(asDiamonds, asHearts)).toBe(true);
-    expect(canBeat(asHearts, asDiamonds)).toBe(false);
+    // 8 cannot be beaten by 8
+    expect(canBeat(eightSpades, eightHearts)).toBe(false);
+    expect(canBeat(eightHearts, eightSpades)).toBe(false);
+    // Higher rank (9) beats 8
+    expect(canBeat(eightSpades, nineSpades)).toBe(true);
+
+    // Ace cannot be beaten by Ace
+    const asSpades = evaluateCombo([makeCard(14, 'S')])!;
+    const asHearts = evaluateCombo([makeCard(14, 'H')])!;
+    expect(canBeat(asSpades, asHearts)).toBe(false);
+
+    // Pairs of same rank cannot beat each other
+    const pairEight1 = evaluateCombo([makeCard(8, 'S'), makeCard(8, 'C')])!;
+    const pairEight2 = evaluateCombo([makeCard(8, 'D'), makeCard(8, 'H')])!;
+    const pairNine = evaluateCombo([makeCard(9, 'S'), makeCard(9, 'C')])!;
+    expect(canBeat(pairEight1, pairEight2)).toBe(false);
+    expect(canBeat(pairEight1, pairNine)).toBe(true);
   });
 
-  it('Poker (2) is highest single and beats any Ace or lower card', () => {
+  it('Poker (2) is highest single and beats any Ace or lower card, but 2 cannot beat 2', () => {
     const asHearts = evaluateCombo([makeCard(14, 'H')])!;
     const pokerSpades = evaluateCombo([makeCard(15, 'S')])!;
     const pokerHearts = evaluateCombo([makeCard(15, 'H')])!;
 
     expect(canBeat(asHearts, pokerSpades)).toBe(true);
-    expect(canBeat(pokerSpades, pokerHearts)).toBe(true);
+    // 2 cannot beat 2 (ga boleh tabrak kartu yang sama)
+    expect(canBeat(pokerSpades, pokerHearts)).toBe(false);
     expect(canBeat(pokerHearts, pokerSpades)).toBe(false);
   });
 
@@ -172,9 +185,35 @@ describe('Engine - canBeat rules', () => {
     expect(canBeat(pokerHearts, bongFours)).toBe(true);
     expect(canBeat(pokerHearts, bongSF)).toBe(true);
 
-    // Normal single (e.g. Jack) cannot be beaten by Bong unless it is Ace/Poker
+    // Poker (2) can also be countered by Tris (kembar 3) or Full House!
+    const trisSevens = evaluateCombo([makeCard(7, 'S'), makeCard(7, 'C'), makeCard(7, 'D')])!;
+    const fullHouseThrees = evaluateCombo([
+      makeCard(3, 'S'), makeCard(3, 'C'), makeCard(3, 'D'),
+      makeCard(4, 'S'), makeCard(4, 'C')
+    ])!;
+    expect(canBeat(pokerHearts, trisSevens)).toBe(true);
+    expect(canBeat(pokerHearts, fullHouseThrees)).toBe(true);
+
+    // Aturan Mutlak Pair: Pair (2 kartu kembar) HANYA boleh ditabrak oleh Pair juga!
+    const pairPoker = evaluateCombo([makeCard(15, 'S'), makeCard(15, 'H')])!;
+    const pairAces = evaluateCombo([makeCard(14, 'S'), makeCard(14, 'H')])!;
+
+    // Tris, Full House, atau Bong TIDAK BISA menabrak Pair!
+    expect(canBeat(pairPoker, trisSevens)).toBe(false);
+    expect(canBeat(pairPoker, fullHouseThrees)).toBe(false);
+    expect(canBeat(pairPoker, bongFours)).toBe(false);
+
+    expect(canBeat(pairAces, trisSevens)).toBe(false);
+    expect(canBeat(pairAces, fullHouseThrees)).toBe(false);
+    expect(canBeat(pairAces, bongFours)).toBe(false);
+
+    // Pair hanya boleh ditabrak oleh Pair yang lebih tinggi
+    expect(canBeat(pairAces, pairPoker)).toBe(true);
+
+    // Normal single (e.g. Jack) cannot be beaten by Bong or Tris
     const jackHearts = evaluateCombo([makeCard(11, 'H')])!;
     expect(canBeat(jackHearts, bongFours)).toBe(false);
+    expect(canBeat(jackHearts, trisSevens)).toBe(false);
   });
 
   it('Bong vs Bong hierarchy: Straight Flush beats 4 of a Kind; higher 4-of-a-kind beats lower', () => {
@@ -191,6 +230,16 @@ describe('Engine - canBeat rules', () => {
     expect(canBeat(bong7s, bong8s)).toBe(true);
     expect(canBeat(bong8s, bong7s)).toBe(false);
     expect(canBeat(bong8s, bongSF)).toBe(true); // Straight Flush beats 4 of a Kind
+
+    // Bong SF of same rank cannot beat each other (tidak boleh tabrak angka sama)
+    const bongSFSpades = evaluateCombo([
+      makeCard(5, 'S'), makeCard(6, 'S'), makeCard(7, 'S'), makeCard(8, 'S')
+    ])!;
+    const bongSFHearts = evaluateCombo([
+      makeCard(5, 'H'), makeCard(6, 'H'), makeCard(7, 'H'), makeCard(8, 'H')
+    ])!;
+    expect(canBeat(bongSFSpades, bongSFHearts)).toBe(false);
+    expect(canBeat(bongSFHearts, bongSFSpades)).toBe(false);
   });
 
   it('Full House vs Full House is decided by the triplet rank', () => {
@@ -248,6 +297,11 @@ describe('Engine - validatePlay & Opening Lead rule', () => {
     const invalidStart = validatePlay(threeHearts, null, true);
     expect(invalidStart.valid).toBe(false);
     expect(invalidStart.error).toContain('3 Waru (3♠)');
+
+    const fourSpades = [makeCard(4, 'S')];
+    const invalidFour = validatePlay(fourSpades, null, true);
+    expect(invalidFour.valid).toBe(false);
+    expect(invalidFour.error).toContain('3 Waru (3♠)');
   });
 
   it('subsequent turns allow valid plays that beat the table', () => {
@@ -265,5 +319,48 @@ describe('Engine - validatePlay & Opening Lead rule', () => {
     // Playing 4S cannot beat 5S
     const invalidLower = validatePlay([makeCard(4, 'S')], play1, false);
     expect(invalidLower.valid).toBe(false);
+
+    // Playing 5H cannot beat 5S (tidak boleh tabrak angka sama)
+    const invalidSame = validatePlay([makeCard(5, 'H')], play1, false);
+    expect(invalidSame.valid).toBe(false);
+  });
+
+  it('comprehensive edge cases: same rank never beats same rank across all ranks', () => {
+    // Check all ranks 3 to 15
+    for (let r = 3; r <= 15; r++) {
+      const spade = evaluateCombo([makeCard(r, 'S')])!;
+      const heart = evaluateCombo([makeCard(r, 'H')])!;
+      expect(canBeat(spade, heart)).toBe(false);
+      expect(canBeat(heart, spade)).toBe(false);
+
+      const pair1 = evaluateCombo([makeCard(r, 'S'), makeCard(r, 'C')])!;
+      const pair2 = evaluateCombo([makeCard(r, 'D'), makeCard(r, 'H')])!;
+      expect(canBeat(pair1, pair2)).toBe(false);
+      expect(canBeat(pair2, pair1)).toBe(false);
+    }
+  });
+
+  it('opening turn allows any combo containing rank 3 when configured for any_3', () => {
+    const rulesAny3 = { ...DEFAULT_RULES, openingCard: 'any_3' as const };
+    const single3D = [makeCard(3, 'D')];
+    expect(validatePlay(single3D, null, true, rulesAny3).valid).toBe(true);
+
+    const tris3 = [makeCard(3, 'S'), makeCard(3, 'C'), makeCard(3, 'D')];
+    expect(validatePlay(tris3, null, true, rulesAny3).valid).toBe(true);
+
+    const fh3Over4 = [
+      makeCard(3, 'S'), makeCard(3, 'C'), makeCard(3, 'D'),
+      makeCard(4, 'S'), makeCard(4, 'H')
+    ];
+    expect(validatePlay(fh3Over4, null, true, rulesAny3).valid).toBe(true);
+
+    const fh4Over3 = [
+      makeCard(4, 'S'), makeCard(4, 'C'), makeCard(4, 'D'),
+      makeCard(3, 'S'), makeCard(3, 'H')
+    ];
+    expect(validatePlay(fh4Over3, null, true, rulesAny3).valid).toBe(true);
+
+    const kingSingle = [makeCard(13, 'H')];
+    expect(validatePlay(kingSingle, null, true, rulesAny3).valid).toBe(false);
   });
 });

@@ -27,7 +27,7 @@
 }
 
 .card-selected {
-  transform: translateY(-22px) scale(1.05);
+  transform: translateY(-22px) scale(1.02);
   box-shadow: 0 12px 28px rgba(234, 179, 8, 0.45), 0 0 15px rgba(250, 204, 21, 0.6);
   border-color: #facc15 !important;
 }
@@ -35,6 +35,255 @@
 .card-hover:hover {
   transform: translateY(-10px);
 }
+
+/* Card Dealing (Bagi Kartu) Animations */
+@keyframes dealIntoHand {
+  0% {
+    opacity: 0;
+    transform: translateY(-90px) scale(0.65) rotate(-12deg);
+  }
+  70% {
+    transform: translateY(4px) scale(1.02) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.animate-deal-hand {
+  animation: dealIntoHand 0.45s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+@keyframes dealFlyBottom {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 140px) scale(0.9) rotate(-6deg);
+  }
+}
+
+@keyframes dealFlyLeft {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-200px, -50%) scale(0.85) rotate(-35deg);
+  }
+}
+
+@keyframes dealFlyTop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -170px) scale(0.85) rotate(15deg);
+  }
+}
+
+@keyframes dealFlyRight {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(160px, -50%) scale(0.85) rotate(35deg);
+  }
+}
+
+.animate-deal-bottom { animation: dealFlyBottom 0.65s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
+.animate-deal-left { animation: dealFlyLeft 0.65s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
+.animate-deal-top { animation: dealFlyTop 0.65s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
+.animate-deal-right { animation: dealFlyRight 0.65s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
+
+/* Directional Card Placement (Naruh Kartu Sampe Ke Meja) Animations */
+@keyframes cardPlaceFromBottom {
+  0% {
+    opacity: 0;
+    transform: translateY(220px) scale(0.8) rotate(calc(var(--card-rot, 0deg) * 2));
+    filter: drop-shadow(0 25px 30px rgba(0, 0, 0, 0.7));
+  }
+  35% {
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-8px) scale(1.05) rotate(var(--card-rot, 0deg));
+    filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(var(--card-rot, 0deg));
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+  }
+}
+
+@keyframes cardPlaceFromTop {
+  0% {
+    opacity: 0;
+    transform: translateY(-200px) scale(0.8) rotate(calc(var(--card-rot, 0deg) * 2));
+    filter: drop-shadow(0 25px 30px rgba(0, 0, 0, 0.7));
+  }
+  35% {
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(8px) scale(1.05) rotate(var(--card-rot, 0deg));
+    filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(var(--card-rot, 0deg));
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+  }
+}
+
+@keyframes cardPlaceFromLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-240px) translateY(20px) scale(0.8) rotate(calc(var(--card-rot, 0deg) * 2));
+    filter: drop-shadow(0 25px 30px rgba(0, 0, 0, 0.7));
+  }
+  35% {
+    opacity: 1;
+  }
+  75% {
+    transform: translateX(8px) translateY(-4px) scale(1.05) rotate(var(--card-rot, 0deg));
+    filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1) rotate(var(--card-rot, 0deg));
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+  }
+}
+
+@keyframes cardPlaceFromRight {
+  0% {
+    opacity: 0;
+    transform: translateX(240px) translateY(20px) scale(0.8) rotate(calc(var(--card-rot, 0deg) * 2));
+    filter: drop-shadow(0 25px 30px rgba(0, 0, 0, 0.7));
+  }
+  35% {
+    opacity: 1;
+  }
+  75% {
+    transform: translateX(-8px) translateY(-4px) scale(1.05) rotate(var(--card-rot, 0deg));
+    filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1) rotate(var(--card-rot, 0deg));
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+  }
+}
+
+.animate-card-place {
+  animation: cardPlaceFromBottom 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.25) both;
+}
+.animate-card-place-bottom {
+  animation: cardPlaceFromBottom 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.25) both;
+}
+.animate-card-place-top {
+  animation: cardPlaceFromTop 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.25) both;
+}
+.animate-card-place-left {
+  animation: cardPlaceFromLeft 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.25) both;
+}
+.animate-card-place-right {
+  animation: cardPlaceFromRight 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.25) both;
+}
+
+/* Table Felt Impact Shockwave */
+@keyframes feltImpactRing {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+    border-width: 4px;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+.animate-felt-impact {
+  animation: feltImpactRing 0.5s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+/* Heavy Banting Micro-Rumble */
+@keyframes tableRumble {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-2px, 3px); }
+  40% { transform: translate(2px, -2px); }
+  60% { transform: translate(-1px, 2px); }
+  80% { transform: translate(1px, -1px); }
+}
+
+.animate-rumble {
+  animation: tableRumble 0.25s ease-out;
+}
+
+/* Badge Spring Pop */
+@keyframes badgeSpringPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(10px);
+  }
+  70% {
+    transform: scale(1.15) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-badge-pop {
+  animation: badgeSpringPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Knock / Shake for Lewat (Pass) */
+@keyframes passKnock {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg) scale(1.1); }
+  50% { transform: rotate(8deg) scale(1.1); }
+  75% { transform: rotate(-4deg); }
+}
+
+.animate-pass-knock {
+  animation: passKnock 0.35s ease-in-out;
+}
+
+/* Staggered delay utilities for multi-card placement */
+.slam-delay-0 { animation-delay: 0ms; }
+.slam-delay-1 { animation-delay: 60ms; }
+.slam-delay-2 { animation-delay: 120ms; }
+.slam-delay-3 { animation-delay: 180ms; }
+.slam-delay-4 { animation-delay: 240ms; }
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {
@@ -51,3 +300,35 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.8);
 }
+
+/* Phone Rotating Animation for Portrait-to-Landscape prompt */
+@keyframes rotatePhoneAnimation {
+  0%, 15% {
+    transform: rotate(0deg);
+  }
+  45%, 70% {
+    transform: rotate(-90deg);
+  }
+  90%, 100% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-rotate-phone {
+  animation: rotatePhoneAnimation 2.4s ease-in-out infinite;
+}
+
+/* Mobile Landscape Optimizations (height <= 520px in landscape mode) */
+@media (max-height: 520px) and (orientation: landscape) {
+  .felt-border-mobile-landscape {
+    border-radius: 24px !important;
+    padding: 0.35rem !important;
+  }
+
+  .felt-table-mobile-landscape {
+    border-radius: 20px !important;
+    padding: 0.4rem !important;
+    min-height: 0 !important;
+  }
+}
+

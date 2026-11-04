@@ -20,15 +20,100 @@ export type ComboType =
   | 'TRIS'
   | 'BONG_FOUR'
   | 'BONG_SF'
-  | 'FULL_HOUSE';
+  | 'FULL_HOUSE'
+  // Poker Jawa combinations
+  | 'STRAIGHT'
+  | 'FLUSH'
+  | 'SPLIT'
+  | 'STRAIGHT_FLUSH'
+  | 'ROYAL_FLUSH'
+  | 'BROTHER'
+  | 'BROTHER_PANJANG'
+  | 'COLOR_TRIS';
 
 export interface HandCombo {
   type: ComboType;
   cards: Card[];
   mainRank: number; // primary comparison rank
   highestSuitValue: number; // secondary comparison suit
+  suit?: Suit; // primary suit for Flush, Straight Flush, Royal Flush, Color Tris
   description: string;
+  level?: number; // for 5-card Paket hierarchy (1=Straight, 2=Colour, 3=Full House, 4=Split, 5=Flush/SF, 6=Royal Flush)
 }
+
+export interface GameRules {
+  preset: 'default_remi' | 'poker_jawa' | 'custom';
+  presetName?: string;
+  
+  // Combinations
+  allowStraight: boolean;       // Straight (5 kartu berurutan beda kembang)
+  allowFlush: boolean;          // Colour (5 kartu sekembang tidak berurutan)
+  allowFullHouse: boolean;      // Full House (3 + 2)
+  allowSplit: boolean;          // Split (3-card Straight Flush + 1 Pair)
+  allowStraightFlush5: boolean; // Flush / Straight Flush 5 kartu sekembang berurutan
+  allowRoyalFlush: boolean;     // Royal Straight Flush (10-J-Q-K-As sekembang)
+  allowBrother: boolean;        // Brother (2 pair berurutan, 4 kartu)
+  allowBrotherPanjang: boolean; // Brother Panjang (3 pair berurutan, 6 kartu)
+  allowColorTris: boolean;      // Color Tris (3 kartu straight flush, 3 kartu)
+  allowBongFour: boolean;       // Bong Four of a Kind (4 kartu kembar)
+  allowBongSF4: boolean;        // Bong 4-card Straight Flush
+  
+  // Mechanics & special rules
+  allowCompareSuitsOnSameRank: boolean; // Boleh tabrak angka sama dengan adu kembang (Sekop > Hati > Keriting > Wajik)
+  allowPaketHierarchy: boolean;         // Di paket 5 kartu: RSF > SF > Split > FH > Colour > Straight
+  pairAbsoluteRule: boolean;            // Aturan Mutlak Pair: Pair HANYA boleh dilawan sesama Pair
+  bombCanCutPoker: boolean;             // Bom (4-of-a-kind, Flush, RSF, Bong) potong kartu 2 ("Poker")
+  cutAceWithTrisOrFH: boolean;          // Patah As dengan Tris atau Full House (aturan default Remi)
+  cutTwoWithTrisOrFH: boolean;          // Patah 2 dengan Tris atau Full House (aturan default Remi)
+  openingCard: '3S' | '3D' | 'any_3';   // Kartu pembuka: 3 Waru (3♠) / 3 Wajik (3♦) / bebas angka 3
+  deckCount: 'auto' | 1 | 2;            // 1 dek, 2 dek, atau auto (1 dek <=5 pemain, 2 dek 6-10 pemain)
+}
+
+export const DEFAULT_RULES: GameRules = {
+  preset: 'default_remi',
+  allowStraight: false,
+  allowFlush: false,
+  allowFullHouse: true,
+  allowSplit: false,
+  allowStraightFlush5: false,
+  allowRoyalFlush: false,
+  allowBrother: false,
+  allowBrotherPanjang: false,
+  allowColorTris: false,
+  allowBongFour: true,
+  allowBongSF4: true,
+  allowCompareSuitsOnSameRank: false,
+  allowPaketHierarchy: false,
+  pairAbsoluteRule: true,
+  bombCanCutPoker: true,
+  cutAceWithTrisOrFH: true,
+  cutTwoWithTrisOrFH: true,
+  openingCard: '3S',
+  deckCount: 'auto'
+};
+
+export const POKER_JAWA_RULES: GameRules = {
+  preset: 'poker_jawa',
+  allowStraight: true,
+  allowFlush: true,
+  allowFullHouse: true,
+  allowSplit: true,
+  allowStraightFlush5: true,
+  allowRoyalFlush: true,
+  allowBrother: true,
+  allowBrotherPanjang: true,
+  allowColorTris: true,
+  allowBongFour: true,
+  allowBongSF4: true,
+  allowCompareSuitsOnSameRank: true,
+  allowPaketHierarchy: true,
+  pairAbsoluteRule: false,
+  bombCanCutPoker: true,
+  cutAceWithTrisOrFH: false,
+  cutTwoWithTrisOrFH: false,
+  openingCard: '3D',
+  deckCount: 'auto'
+};
 
 export interface PlayedTrick {
   playerId: string;
@@ -50,6 +135,7 @@ export interface Player {
   isHost: boolean;
   seatIndex: number; // 0, 1, 2, 3
   score: number;
+  finishRank?: number | null; // 1 (Juara 1), 2 (Juara 2), dst
 }
 
 export type GameStatus = 'waiting' | 'dealing' | 'playing' | 'round_over' | 'game_over';
@@ -70,6 +156,9 @@ export interface GameState {
   roomName: string;
   status: GameStatus;
   players: Player[];
+  maxPlayers: number;
+  fillWithBots: boolean;
+  rules: GameRules;
   currentTurnPlayerId: string | null;
   turnTimeRemaining: number;
   turnTimerMax: number;
@@ -80,6 +169,7 @@ export interface GameState {
   isFirstTurnOfGame: boolean;
   leadPlayerId: string | null;
   winnerId: string | null;
+  finishers?: string[]; // Urutan ID pemain yang sudah habis kartunya (Juara 1, 2, dst)
   results: GameResult[] | null;
 }
 
@@ -96,6 +186,9 @@ export interface RoomListItem {
   roomId: string;
   roomName: string;
   playerCount: number;
+  maxPlayers: number;
   status: GameStatus;
+  fillWithBots?: boolean;
   hasPassword?: boolean;
+  rules?: GameRules;
 }

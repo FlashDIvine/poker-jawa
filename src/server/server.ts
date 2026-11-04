@@ -34,12 +34,14 @@ app.get('/api/rooms', (req, res) => {
 });
 
 app.post('/api/rooms', (req, res) => {
-  const { roomName, fillWithBots, turnTimerSeconds } = req.body || {};
-  const room = roomManager.createRoom(roomName, { fillWithBots, turnTimerSeconds });
+  const { roomName, fillWithBots, turnTimerSeconds, maxPlayers, rules } = req.body || {};
+  const room = roomManager.createRoom(roomName, { fillWithBots, turnTimerSeconds, maxPlayers, rules });
   res.json({
     roomId: room.id,
     roomName: room.name,
-    fillWithBots: room.fillWithBots
+    fillWithBots: room.fillWithBots,
+    maxPlayers: room.maxPlayers,
+    rules: room.rules
   });
 });
 
@@ -78,7 +80,7 @@ io.on('connection', (socket) => {
 
     const player = room.addPlayer(validPlayerId, playerName, avatar);
     if (!player) {
-      socket.emit('error_message', 'Meja sudah penuh (maksimal 4 pemain).');
+      socket.emit('error_message', `Meja sudah penuh (maksimal ${room.maxPlayers} pemain).`);
       return;
     }
 
@@ -116,7 +118,7 @@ io.on('connection', (socket) => {
 
     const started = room.startGame();
     if (!started) {
-      socket.emit('error_message', 'Gagal memulai permainan. Butuh tepat 4 pemain.');
+      socket.emit('error_message', `Gagal memulai permainan. Butuh minimal 2 pemain (hingga maksimal ${room.maxPlayers} pemain).`);
     }
   });
 

@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
-import { Card, GameResult, GameState, Player, PlayedTrick, ChatMessage, RoomListItem } from '../shared/types.js';
-import { createDeck, shuffleDeck, dealDeck, findPlayerWithThreeSpades, sortCards } from '../shared/deck.js';
+import { Card, GameResult, GameState, Player, PlayedTrick, ChatMessage, RoomListItem, GameRules, DEFAULT_RULES } from '../shared/types.js';
+import { createDeck, shuffleDeck, dealDeck, findStarterPlayer, sortCards } from '../shared/deck.js';
 import { validatePlay } from '../shared/engine.js';
 import { decideBotMove, BOT_NAMES, BOT_AVATARS } from '../shared/bot.js';
 
@@ -8,6 +8,8 @@ export interface RoomOptions {
   roomName?: string;
   fillWithBots?: boolean;
   turnTimerSeconds?: number;
+  maxPlayers?: number;
+  rules?: Partial<GameRules>;
 }
 
 export class Room {
@@ -15,24 +17,34 @@ export class Room {
   public name: string;
   public fillWithBots: boolean;
   public turnTimerSeconds: number;
+  public maxPlayers: number;
+  public rules: GameRules;
   public state: GameState;
   public chatMessages: ChatMessage[] = [];
   private io: Server;
   private turnInterval: NodeJS.Timeout | null = null;
   private botTimeout: NodeJS.Timeout | null = null;
+  private finishers: string[] = [];
 
   constructor(id: string, name: string, io: Server, options?: RoomOptions) {
     this.id = id;
     this.name = name || `Meja #${id}`;
     this.io = io;
-    this.fillWithBots = options?.fillWithBots ?? true;
+    this.fillWithBots = options?.fillWithBots ?? false;
     this.turnTimerSeconds = options?.turnTimerSeconds || 15;
+    this.maxPlayers = options?.maxPlayers ? Math.min(10, Math.max(2, options.maxPlayers)) : 4;
+    this.rules = { ...DEFAULT_RULES, ...(options?.rules || {}) };
+    if (this.rules.deckCount === '1' as any) this.rules.deckCount = 1;
+    if (this.rules.deckCount === '2' as any) this.rules.deckCount = 2;
 
     this.state = {
       roomId: this.id,
       roomName: this.name,
       status: 'waiting',
       players: [],
+      maxPlayers: this.maxPlayers,
+      fillWithBots: this.fillWithBots,
+      rules: this.rules,
       currentTurnPlayerId: null,
       turnTimeRemaining: this.turnTimerSeconds,
       turnTimerMax: this.turnTimerSeconds,
@@ -62,7 +74,7 @@ export class Room {
       return existing;
     }
 
-    if (this.state.players.length >= 4) {
+    if (this.state.players.length >= this.maxPlayers) {
       if (this.state.status === 'waiting') {
         const botIdx = this.state.players.findIndex(p => p.isBot);
         if (botIdx !== -1) {
@@ -140,10 +152,10 @@ export class Room {
   public startGame(): boolean {
     if (this.state.status === 'playing') return false;
 
-    // Fill remaining seats with bots if needed
-    if (this.fillWithBots && this.state.players.length < 4) {
+    // Fill remaining seats with bots if needed up to maxPlayers
+    if (this.fillWithBots && this.state.players.length < this.maxPlayers) {
       let botNameIdx = 0;
-      while (this.state.players.length < 4) {
+      while (this.state.players.length < this.maxPlayers) {
         const seatIdx = this.state.players.length;
         const botName = BOT_NAMES[botNameIdx % BOT_NAMES.length];
         const botAvatar = BOT_AVATARS[botNameIdx % BOT_AVATARS.length];
@@ -166,22 +178,32 @@ export class Room {
       }
     }
 
-    if (this.state.players.length !== 4) {
-      return false; // Exactly 4 players required
+    if (this.state.players.length < 2 || this.state.players.length > this.maxPlayers) {
+      return false; // Butuh minimal 2 pemain hingga maxPlayers
     }
 
-    // Deal cards
-    const deck = shuffleDeck(createDeck());
-    const hands = dealDeck(deck);
+    // Pastikan index kursi terurut rapi
+    this.state.players.forEach((player, idx) => {
+      player.seatIndex = idx;
+    });
+
+    // Deal cards (dibagi habis ke semua pemain)
+    const useTwoDecks = Number(this.rules.deckCount) === 2 || (this.rules.deckCount === 'auto' && this.state.players.length >= 6);
+    const deck = shuffleDeck(createDeck(useTwoDecks ? 2 : 1));
+    const hands = dealDeck(deck, this.state.players.length);
+
+    this.finishers = [];
+    this.state.finishers = [];
 
     this.state.players.forEach((player, idx) => {
       player.hand = hands[idx];
       player.cardCount = hands[idx].length;
       player.passed = false;
+      player.finishRank = null;
     });
 
-    // Find starter with 3 Waru (3♠)
-    const starterIdx = findPlayerWithThreeSpades(hands);
+    // Find starter with opening card (3 Waru / 3 Wajik)
+    const starterIdx = findStarterPlayer(hands, this.rules.openingCard);
     const starter = this.state.players[starterIdx];
 
     if (this.state.results) {
@@ -198,7 +220,8 @@ export class Room {
     this.state.winnerId = null;
     this.state.results = null;
 
-    this.broadcastSystemChat(`Permainan dimulai! ${starter.name} memegang 3 Waru (3♠) dan membuka langkah pertama.`);
+    const starterCardName = this.rules.openingCard === '3D' ? '3 Wajik (3♦)' : '3 Waru (3♠)';
+    this.broadcastSystemChat(`Permainan dimulai! ${starter.name} memegang ${starterCardName} dan membuka langkah pertama.`);
     this.startTurnTimer();
     this.broadcastState();
     this.triggerBotTurnIfNeeded();
@@ -227,7 +250,8 @@ export class Room {
     const validation = validatePlay(
       playedCards,
       this.state.lastPlay,
-      this.state.isFirstTurnOfGame
+      this.state.isFirstTurnOfGame,
+      this.rules
     );
 
     if (!validation.valid || !validation.combo) {
@@ -250,34 +274,39 @@ export class Room {
     this.state.trickHistory.push(playedTrick);
     this.state.isFirstTurnOfGame = false;
     this.state.leadPlayerId = player.id;
-    player.passed = false;
+    this.state.consecutivePasses = 0; // Reset consecutive pass counter setiap kali kartu baru dikeluarkan
+    this.state.players.forEach(p => (p.passed = false)); // Reset status lewat: saat giliran berputar, pemain lain masih bisa jalan lagi
 
     // Announce the play
     this.broadcastSystemChat(`${player.name} mengeluarkan: ${validation.combo.description}`);
 
-    // Check if player won!
-    if (player.hand.length === 0) {
-      this.handleGameOver(player);
-      return { success: true };
+    // Check if THIS player just ran out of cards!
+    if (player.hand.length === 0 && !player.finishRank) {
+      const rank = this.finishers.length + 1;
+      player.finishRank = rank;
+      this.finishers.push(player.id);
+      this.state.finishers = [...this.finishers];
+
+      const trophy = rank === 1 ? '🥇 Juara 1' : rank === 2 ? '🥈 Juara 2' : rank === 3 ? '🥉 Juara 3' : `Peringkat ${rank}`;
+      this.broadcastSystemChat(`🎉 ${player.name} telah menghabiskan semua kartunya sebagai ${trophy}!`);
+
+      // Check remaining active players with cards
+      const remainingActive = this.state.players.filter(p => p.hand.length > 0);
+      if (remainingActive.length <= 1) {
+        // Hanya tersisa 1 pemegang kartu terakhir -> Game selesai!
+        if (remainingActive.length === 1) {
+          const lastPlayer = remainingActive[0];
+          lastPlayer.finishRank = this.finishers.length + 1;
+          this.finishers.push(lastPlayer.id);
+          this.state.finishers = [...this.finishers];
+          this.broadcastSystemChat(`🏁 Permainan selesai! ${lastPlayer.name} memegang kartu terakhir.`);
+        }
+        this.handleGameOver();
+        return { success: true };
+      }
     }
 
-    // Check if all other players had already passed earlier in this trick
-    const activeOpponents = this.state.players.filter(p => p.id !== player.id && !p.passed);
-    if (activeOpponents.length === 0) {
-      this.broadcastSystemChat(`Semua lawan telah lewat! ${player.name} memenangkan putaran dan memimpin babak baru.`);
-      this.state.lastPlay = null;
-      this.state.trickHistory = [];
-      this.state.consecutivePasses = 0;
-      this.state.players.forEach(p => (p.passed = false));
-      this.state.currentTurnPlayerId = player.id;
-      this.state.leadPlayerId = player.id;
-      this.startTurnTimer();
-      this.broadcastState();
-      this.triggerBotTurnIfNeeded();
-      return { success: true };
-    }
-
-    // Advance to next clockwise player
+    // Advance to next clockwise player who still has cards
     this.advanceTurn();
     return { success: true };
   }
@@ -292,7 +321,7 @@ export class Room {
     }
 
     if (this.state.isFirstTurnOfGame) {
-      return { success: false, error: 'Pemain dengan 3 Waru tidak boleh lewat pada giliran pertama!' };
+      return { success: false, error: 'Pemain pembuka tidak boleh lewat pada giliran pertama (wajib buang angka 3)!' };
     }
 
     if (!this.state.lastPlay) {
@@ -305,19 +334,29 @@ export class Room {
     player.passed = true;
     this.broadcastSystemChat(`${player.name} memilih Lewat (Pass).`);
 
-    const passedCount = this.state.players.filter(p => p.passed).length;
-    this.state.consecutivePasses = passedCount;
+    this.state.consecutivePasses++;
+    const activePlayers = this.state.players.filter(p => p.hand.length > 0);
+    const isLeadActive = (this.getPlayer(this.state.leadPlayerId || '')?.hand.length || 0) > 0;
+    const requiredPasses = isLeadActive ? activePlayers.length - 1 : activePlayers.length;
 
-    // If 3 players have passed, trick is over!
-    if (passedCount >= 3) {
-      const winner = this.getPlayer(this.state.leadPlayerId || '') || player;
-      this.broadcastSystemChat(`Semua pemain lewat! ${winner.name} memenangkan putaran dan memimpin babak baru.`);
+    // Jika seluruh pemain aktif lain berturut-turut lewat, putaran berakhir!
+    if (this.state.consecutivePasses >= requiredPasses) {
+      let winner: Player;
+      if (isLeadActive) {
+        winner = this.getPlayer(this.state.leadPlayerId || '') || player;
+        this.broadcastSystemChat(`Semua pemain lain lewat! ${winner.name} memenangkan putaran dan memimpin babak baru.`);
+      } else {
+        // Jika pemenang putaran sebelumnya sudah habis kartunya, serahkan meja bebas ke pemain aktif berikutnya
+        winner = this.getNextActivePlayer(this.state.leadPlayerId || '');
+        this.broadcastSystemChat(`Semua pemain lain lewat! Meja bebas diserahkan kepada ${winner.name}.`);
+      }
+
       this.state.lastPlay = null;
       this.state.trickHistory = [];
       this.state.consecutivePasses = 0;
       this.state.players.forEach(p => (p.passed = false));
 
-      // Trick winner gets the next turn!
+      // Pemenang putaran berhak memimpin kartu di meja bebas
       this.state.currentTurnPlayerId = winner.id;
       this.state.leadPlayerId = winner.id;
       this.startTurnTimer();
@@ -330,14 +369,28 @@ export class Room {
     return { success: true };
   }
 
+  private getNextActivePlayer(fromPlayerId: string): Player {
+    const total = this.state.players.length;
+    let idx = this.state.players.findIndex(p => p.id === fromPlayerId);
+    if (idx === -1) idx = 0;
+    for (let i = 1; i <= total; i++) {
+      const next = this.state.players[(idx + i) % total];
+      if (next.hand.length > 0) {
+        return next;
+      }
+    }
+    return this.state.players[idx];
+  }
+
   private advanceTurn(): void {
-    const currentIdx = this.state.players.findIndex(p => p.id === this.state.currentTurnPlayerId);
-    let nextIdx = (currentIdx + 1) % 4;
-    while (this.state.players[nextIdx].passed) {
-      nextIdx = (nextIdx + 1) % 4;
+    const activePlayers = this.state.players.filter(p => p.hand.length > 0);
+    if (activePlayers.length <= 1) {
+      this.handleGameOver();
+      return;
     }
 
-    this.state.currentTurnPlayerId = this.state.players[nextIdx].id;
+    const nextPlayer = this.getNextActivePlayer(this.state.currentTurnPlayerId || '');
+    this.state.currentTurnPlayerId = nextPlayer.id;
     this.startTurnTimer();
     this.broadcastState();
     this.triggerBotTurnIfNeeded();
@@ -377,14 +430,20 @@ export class Room {
     if (!currentPlayer) return;
 
     // Timeout: bot logic takes the move automatically
-    const move = decideBotMove(currentPlayer.hand, this.state.lastPlay, this.state.isFirstTurnOfGame);
+    const move = decideBotMove(currentPlayer.hand, this.state.lastPlay, this.state.isFirstTurnOfGame, this.rules);
 
     if (move && move.length > 0) {
       this.playCards(currentPlayer.id, move.map(c => c.id));
     } else {
       if (this.state.isFirstTurnOfGame || !this.state.lastPlay) {
         // Must play something
-        const fallback = currentPlayer.hand.find(c => c.isThreeSpades) || currentPlayer.hand[0];
+        const fallback = (this.state.isFirstTurnOfGame
+          ? (this.rules.openingCard === '3D'
+              ? currentPlayer.hand.find(c => c.rank === 3 && c.suit === 'D')
+              : this.rules.openingCard === '3S'
+              ? currentPlayer.hand.find(c => c.isThreeSpades || (c.rank === 3 && c.suit === 'S'))
+              : null) || currentPlayer.hand.find(c => c.rank === 3)
+          : null) || currentPlayer.hand[0];
         this.playCards(currentPlayer.id, [fallback.id]);
       } else {
         this.passTurn(currentPlayer.id);
@@ -410,13 +469,19 @@ export class Room {
       this.botTimeout = setTimeout(() => {
         if (this.state.status !== 'playing' || this.state.currentTurnPlayerId !== currentPlayer.id) return;
 
-        const move = decideBotMove(currentPlayer.hand, this.state.lastPlay, this.state.isFirstTurnOfGame);
+        const move = decideBotMove(currentPlayer.hand, this.state.lastPlay, this.state.isFirstTurnOfGame, this.rules);
 
         if (move && move.length > 0) {
           this.playCards(currentPlayer.id, move.map(c => c.id));
         } else {
           if (this.state.isFirstTurnOfGame || !this.state.lastPlay) {
-            const fallback = currentPlayer.hand.find(c => c.isThreeSpades) || currentPlayer.hand[0];
+            const fallback = (this.state.isFirstTurnOfGame
+              ? (this.rules.openingCard === '3D'
+                  ? currentPlayer.hand.find(c => c.rank === 3 && c.suit === 'D')
+                  : this.rules.openingCard === '3S'
+                  ? currentPlayer.hand.find(c => c.isThreeSpades || (c.rank === 3 && c.suit === 'S'))
+                  : null) || currentPlayer.hand.find(c => c.rank === 3)
+              : null) || currentPlayer.hand[0];
             this.playCards(currentPlayer.id, [fallback.id]);
           } else {
             this.passTurn(currentPlayer.id);
@@ -426,7 +491,7 @@ export class Room {
     }
   }
 
-  private handleGameOver(winner: Player): void {
+  private handleGameOver(): void {
     if (this.turnInterval) {
       clearInterval(this.turnInterval);
       this.turnInterval = null;
@@ -436,18 +501,39 @@ export class Room {
       this.botTimeout = null;
     }
 
-    this.state.status = 'game_over';
-    this.state.winnerId = winner.id;
+    // Pastikan seluruh pemain yang belum masuk finishers (pemegang kartu terakhir) dicatat
+    const remaining = this.state.players.filter(p => !this.finishers.includes(p.id));
+    remaining.forEach(p => {
+      p.finishRank = this.finishers.length + 1;
+      this.finishers.push(p.id);
+    });
+    this.state.finishers = [...this.finishers];
 
-    // Calculate ranking and penalty scores:
-    // 1 card = 1 penalty pt. If holding a Poker (2), penalty is doubled!
+    this.state.status = 'game_over';
+    this.state.winnerId = this.finishers[0] || null;
+
+    const winner = this.getPlayer(this.finishers[0] || '');
+
+    // Hitung ranking dan penalti berdasarkan urutan habisnya kartu (finishers)
     const results: GameResult[] = this.state.players.map(p => {
+      const rank = p.finishRank || (this.finishers.indexOf(p.id) + 1);
       let penalty = p.hand.length;
       const hasPoker = p.hand.some(c => c.isPoker);
       if (hasPoker) {
         penalty *= 2; // Capsa banting rule: caught holding Poker doubles penalty!
       }
-      const scoreDelta = p.id === winner.id ? +30 : -penalty;
+
+      let scoreDelta = 0;
+      if (rank === 1) {
+        scoreDelta = 30;
+      } else if (rank === 2 && this.state.players.length >= 4) {
+        scoreDelta = 10;
+      } else if (rank === 2 && this.state.players.length === 3) {
+        scoreDelta = 0;
+      } else {
+        scoreDelta = -penalty;
+      }
+
       p.score += scoreDelta;
 
       return {
@@ -455,26 +541,20 @@ export class Room {
         playerName: p.name,
         avatar: p.avatar,
         isBot: p.isBot,
-        rank: p.id === winner.id ? 1 : 2, // will be sorted
+        rank,
         remainingCards: p.hand.length,
         scoreDelta,
-        isWinner: p.id === winner.id
+        isWinner: rank === 1
       };
     });
 
-    // Sort non-winners by remaining cards ascending
-    results.sort((a, b) => {
-      if (a.isWinner) return -1;
-      if (b.isWinner) return 1;
-      return a.remainingCards - b.remainingCards;
-    });
-
-    results.forEach((r, idx) => {
-      r.rank = idx + 1;
-    });
+    // Urutkan hasil berdasarkan peringkat 1, 2, 3, 4
+    results.sort((a, b) => a.rank - b.rank);
 
     this.state.results = results;
-    this.broadcastSystemChat(`🏆 ${winner.name} TELAH MEMENANGKAN PERTANDINGAN!`);
+    if (winner) {
+      this.broadcastSystemChat(`🏆 ${winner.name} ADALAH JUARA 1 PERTANDINGAN!`);
+    }
     this.broadcastState();
   }
 
@@ -576,10 +656,13 @@ export class Room {
     this.state.consecutivePasses = 0;
     this.state.winnerId = null;
     this.state.results = null;
+    this.finishers = [];
+    this.state.finishers = [];
     this.state.players.forEach(p => {
       p.hand = [];
       p.cardCount = 0;
       p.passed = false;
+      p.finishRank = null;
     });
 
     this.broadcastSystemChat('Meja siap untuk ronde berikutnya. Klik Mulai saat siap!');
@@ -630,7 +713,10 @@ export class RoomManager {
         roomId: room.id,
         roomName: room.name,
         playerCount: room.state.players.length,
-        status: room.state.status
+        maxPlayers: room.maxPlayers,
+        status: room.state.status,
+        fillWithBots: room.fillWithBots,
+        rules: room.rules
       });
     }
     return list;

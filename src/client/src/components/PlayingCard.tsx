@@ -22,9 +22,9 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   disabled = false
 }) => {
   const sizeClasses = {
-    sm: 'w-10 h-14 text-xs rounded-md',
-    md: 'w-14 h-20 sm:w-16 sm:h-24 text-sm sm:text-base rounded-lg',
-    lg: 'w-16 h-24 sm:w-20 sm:h-28 text-base sm:text-lg rounded-xl'
+    sm: 'w-8 h-12 sm:w-10 sm:h-14 text-[10px] sm:text-xs rounded-md',
+    md: 'w-12 h-17 sm:w-16 sm:h-24 text-xs sm:text-base rounded-lg landscape:w-12 landscape:h-17 landscape:sm:w-15 landscape:sm:h-22',
+    lg: 'w-14 h-20 sm:w-20 sm:h-28 text-sm sm:text-lg rounded-xl'
   };
 
   if (faceDown || !card || card.rankLabel === '?') {
@@ -55,8 +55,8 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
         sizeClasses[size]
       } ${
         selected
-          ? 'card-selected border-amber-400 z-30'
-          : 'border-slate-300 hover:border-amber-300 card-hover cursor-pointer z-10'
+          ? 'card-selected border-amber-400'
+          : 'border-slate-300 hover:border-amber-300 card-hover cursor-pointer'
       } ${disabled ? 'opacity-75 cursor-not-allowed' : ''} ${className}`}
     >
       {/* Top Left Rank & Suit */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { RoomListItem } from '@shared/types.js';
-import { Play, Plus, LogIn, BookOpen, Volume2, VolumeX, Sparkles, RefreshCw } from 'lucide-react';
+import { RoomListItem, GameRules, DEFAULT_RULES, POKER_JAWA_RULES } from '@shared/types.js';
+import { Play, Plus, LogIn, BookOpen, Volume2, VolumeX, Sparkles, RefreshCw, Settings2, ChevronDown, ChevronUp, Users, Maximize, Minimize } from 'lucide-react';
 import { sounds } from '../audio/soundEffects.js';
 
 interface LobbyProps {
@@ -8,7 +8,7 @@ interface LobbyProps {
   onPlayerNameChange: (name: string) => void;
   playerAvatar: string;
   onPlayerAvatarChange: (avatar: string) => void;
-  onCreateRoom: (roomName: string, fillWithBots: boolean, turnTimerSeconds: number) => void;
+  onCreateRoom: (roomName: string, fillWithBots: boolean, turnTimerSeconds: number, maxPlayers: number, rules: GameRules) => void;
   onJoinRoom: (roomId: string) => void;
   onOpenRules: () => void;
 }
@@ -28,9 +28,39 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [newRoomName, setNewRoomName] = useState('');
   const [fillBots, setFillBots] = useState(true);
   const [timerSeconds, setTimerSeconds] = useState(15);
+  const [maxPlayers, setMaxPlayers] = useState(4);
+  const [rules, setRules] = useState<GameRules>({ ...DEFAULT_RULES });
+  const [showAdvancedRules, setShowAdvancedRules] = useState(false);
   const [publicRooms, setPublicRooms] = useState<RoomListItem[]>([]);
   const [isMuted, setIsMuted] = useState(!sounds.enabled);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const handleToggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        const docEl = document.documentElement as any;
+        if (docEl.requestFullscreen) await docEl.requestFullscreen();
+        else if (docEl.webkitRequestFullscreen) await docEl.webkitRequestFullscreen();
+        if (window.screen?.orientation && 'lock' in window.screen.orientation) {
+          await (window.screen.orientation as any).lock('landscape').catch(() => {});
+        }
+      } else {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen();
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
 
   const fetchRooms = async () => {
     setLoadingRooms(true);
@@ -58,14 +88,32 @@ export const Lobby: React.FC<LobbyProps> = ({
     setIsMuted(!enabled);
   };
 
-  // Quick Play 1-click vs 3 Bots
+  const handlePresetChange = (preset: 'default_remi' | 'poker_jawa' | 'custom') => {
+    if (preset === 'default_remi') {
+      setRules({ ...DEFAULT_RULES });
+    } else if (preset === 'poker_jawa') {
+      setRules({ ...POKER_JAWA_RULES });
+    } else {
+      setRules(prev => ({ ...prev, preset: 'custom' }));
+    }
+  };
+
+  const updateRuleField = <K extends keyof GameRules>(field: K, value: GameRules[K]) => {
+    setRules(prev => ({
+      ...prev,
+      [field]: value,
+      preset: 'custom'
+    }));
+  };
+
+  // Quick Play 1-click vs 3 Bots with Default Remi rules
   const handleQuickPlay = () => {
-    onCreateRoom(`Solo Meja ${playerName}`, true, 15);
+    onCreateRoom(`Solo Meja ${playerName}`, true, 15, 4, { ...DEFAULT_RULES });
   };
 
   const handleCreateCustom = (e: React.FormEvent) => {
     e.preventDefault();
-    onCreateRoom(newRoomName || `Meja ${playerName}`, fillBots, timerSeconds);
+    onCreateRoom(newRoomName || `Meja ${playerName}`, fillBots, timerSeconds, maxPlayers, rules);
   };
 
   const handleJoinByCode = (e: React.FormEvent) => {
@@ -79,13 +127,22 @@ export const Lobby: React.FC<LobbyProps> = ({
       {/* Top Utility Bar (Sound, Rules) */}
       <div className="w-full flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">🃏</span>
+          <span className="text-2xl text-amber-400">🎴</span>
           <span className="font-extrabold tracking-wider text-xs uppercase text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2.5 py-1 rounded-full">
-            Indonesian Poker Remi
+            Indonesian Poker Remi & Poker Jawa
           </span>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Fullscreen Button */}
+          <button
+            onClick={handleToggleFullscreen}
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 shadow cursor-pointer transition-all active:scale-95"
+            title={isFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh (Landscape)'}
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4 text-amber-400" /> : <Maximize className="w-4 h-4 text-slate-300" />}
+          </button>
+
           <button
             onClick={onOpenRules}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 shadow cursor-pointer transition-all active:scale-95"
@@ -109,8 +166,8 @@ export const Lobby: React.FC<LobbyProps> = ({
         <h1 className="text-4xl sm:text-6xl font-black font-serif-poker tracking-tight bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 bg-clip-text text-transparent drop-shadow-md">
           POKER REMI
         </h1>
-        <p className="text-slate-400 text-sm sm:text-base mt-2 max-w-md mx-auto">
-          Capsa Banting Multi-pemain Real-time dengan Aturan Patah As, Bom Bong, dan Pembuka 3 Waru.
+        <p className="text-slate-400 text-sm sm:text-base mt-2 max-w-lg mx-auto">
+          Capsa Banting Multi-pemain Real-time (2 - 10 Orang) dengan Aturan Default Remi & Setelan Aturan Poker Jawa Lengkap.
         </p>
       </div>
 
@@ -185,7 +242,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-lg shadow-amber-500/25 transition-all active:scale-95 cursor-pointer"
           >
             <Play className="w-5 h-5 fill-current" />
-            <span>Mulai Main Sekarang (1 Klik)</span>
+            <span>Mulai Main Sekarang (Aturan Default)</span>
           </button>
         </div>
 
@@ -231,10 +288,10 @@ export const Lobby: React.FC<LobbyProps> = ({
         <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-md">
           <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider mb-1">
             <Plus className="w-4 h-4" />
-            <span>Kustomisasi Meja</span>
+            <span>Kustomisasi Meja & Aturan</span>
           </div>
           <h3 className="text-lg font-bold text-slate-100 mb-4">
-            Buat Meja Baru
+            Buat Meja Baru (2 - 10 Pemain)
           </h3>
 
           <form onSubmit={handleCreateCustom} className="space-y-4 text-xs">
@@ -250,10 +307,264 @@ export const Lobby: React.FC<LobbyProps> = ({
               />
             </div>
 
+            {/* Max Players Selector (2 to 10 players) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-300 font-medium flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Kapasitas Pemain:</span>
+                  <span className="font-bold text-amber-300 text-sm">{maxPlayers} Orang</span>
+                </label>
+                <span className="text-[10px] text-slate-400">Bebas main 2-10 orang</span>
+              </div>
+              <div className="grid grid-cols-5 sm:grid-cols-9 gap-1">
+                {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setMaxPlayers(num)}
+                    className={`py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      maxPlayers === num
+                        ? 'bg-amber-500 text-slate-950 shadow ring-1 ring-amber-300'
+                        : 'bg-slate-950 text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Rules Preset Tabs */}
+            <div>
+              <label className="text-slate-400 block mb-1.5 font-medium">Setelan Aturan & Kombinasi</label>
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => handlePresetChange('default_remi')}
+                  className={`py-1.5 px-2 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                    rules.preset === 'default_remi'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Aturan bawaan Poker Remi / Capsa Banting (Satuan, Pair, Tris, Bong 4, Full House)"
+                >
+                  Default (Remi)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePresetChange('poker_jawa')}
+                  className={`py-1.5 px-2 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                    rules.preset === 'poker_jawa'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Aturan Poker Jawa lengkap: Straight, Colour, Split, Straight Flush, Royal Flush, Brother, Color Tris"
+                >
+                  Poker Jawa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePresetChange('custom')}
+                  className={`py-1.5 px-2 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                    rules.preset === 'custom'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Pilih kombinasi dan mekanisme kartu sesuka hati"
+                >
+                  Kustom
+                </button>
+              </div>
+            </div>
+
+            {/* Advanced Combination Toggles Accordion */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedRules(!showAdvancedRules)}
+                className="w-full flex items-center justify-between text-xs font-semibold text-amber-400 cursor-pointer"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span>Detail Kombinasi & Mekanisme ({rules.preset === 'default_remi' ? 'Aturan Default' : rules.preset === 'poker_jawa' ? 'Aturan Poker Jawa' : 'Kustom'})</span>
+                </span>
+                {showAdvancedRules ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {showAdvancedRules && (
+                <div className="mt-3 pt-3 border-t border-slate-800 space-y-2 text-[11px] text-slate-300">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Kombinasi Kartu Aktif</span>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowStraight}
+                        onChange={(e) => updateRuleField('allowStraight', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Straight (Seri 5)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowFlush}
+                        onChange={(e) => updateRuleField('allowFlush', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Colour / Flush (5)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowFullHouse}
+                        onChange={(e) => updateRuleField('allowFullHouse', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Full House (3+2)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowSplit}
+                        onChange={(e) => updateRuleField('allowSplit', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Split (Color 3 + Pair)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowStraightFlush5}
+                        onChange={(e) => updateRuleField('allowStraightFlush5', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Straight Flush (5)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowRoyalFlush}
+                        onChange={(e) => updateRuleField('allowRoyalFlush', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Royal Straight Flush</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowBrother}
+                        onChange={(e) => updateRuleField('allowBrother', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Brother (2 Pair - 4)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowBrotherPanjang}
+                        onChange={(e) => updateRuleField('allowBrotherPanjang', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Brother Panjang (6)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowColorTris}
+                        onChange={(e) => updateRuleField('allowColorTris', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Color Tris (3 SF)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowBongFour}
+                        onChange={(e) => updateRuleField('allowBongFour', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Bong 4 of a Kind</span>
+                    </label>
+                  </div>
+
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block pt-2 border-t border-slate-800/80">Mekanisme Khusus</span>
+                  
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.allowCompareSuitsOnSameRank}
+                        onChange={(e) => updateRuleField('allowCompareSuitsOnSameRank', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Adu Kembang jika Angka Sama (Sekop &gt; Hati &gt; Keriting &gt; Wajik)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.pairAbsoluteRule}
+                        onChange={(e) => updateRuleField('pairAbsoluteRule', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Aturan Mutlak Pair (Pair hanya boleh dilawan Pair)</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rules.cutAceWithTrisOrFH}
+                        onChange={(e) => updateRuleField('cutAceWithTrisOrFH', e.target.checked)}
+                        className="accent-amber-500 cursor-pointer"
+                      />
+                      <span>Patah As (Kartu As satuan bisa dipatahkan Tris / Full House)</span>
+                    </label>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span>Kartu Pembuka Putaran Pertama:</span>
+                      <select
+                        value={rules.openingCard}
+                        onChange={(e) => updateRuleField('openingCard', e.target.value as any)}
+                        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-[11px]"
+                      >
+                        <option value="3S">3 Waru (3♠ - Default Remi)</option>
+                        <option value="3D">3 Wajik (3♦ - Poker Jawa)</option>
+                        <option value="any_3">Bebas Angka 3</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span>Jumlah Dek Kartu:</span>
+                      <select
+                        value={rules.deckCount}
+                        onChange={(e) => updateRuleField('deckCount', e.target.value as any)}
+                        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-[11px]"
+                      >
+                        <option value="auto">Otomatis (1 Dek &le;5 org, 2 Dek &ge;6 org)</option>
+                        <option value="1">1 Dek Standar (52 Kartu)</option>
+                        <option value="2">2 Dek (104 Kartu)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <span className="font-semibold text-slate-200 block">Isi Otomatis dengan Bot</span>
-                <span className="text-[11px] text-slate-500">Mulai langsung jika kursi kosong</span>
+                <span className="text-[11px] text-slate-500">Isi kursi kosong dengan AI saat mulai</span>
               </div>
               <input
                 type="checkbox"
@@ -281,7 +592,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow transition-all active:scale-95 cursor-pointer mt-2"
             >
               <Plus className="w-4 h-4 text-emerald-400" />
-              <span>Buat Meja</span>
+              <span>Buat Meja ({maxPlayers} Pemain)</span>
             </button>
           </form>
         </div>
@@ -302,46 +613,59 @@ export const Lobby: React.FC<LobbyProps> = ({
               </button>
             </div>
 
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
               {publicRooms.length === 0 ? (
                 <div className="text-center py-8 text-xs text-slate-500">
                   Belum ada meja terbuka. Buat meja baru atau coba Main Solo!
                 </div>
               ) : (
-                publicRooms.map((room: RoomListItem) => (
-                  <div
-                    key={room.roomId}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs"
-                  >
-                    <div>
-                      <span className="font-semibold text-slate-200 block truncate max-w-[150px]">
-                        {room.roomName}
-                      </span>
-                      <span className="text-[10px] text-amber-400/80 font-mono">
-                        Kode: {room.roomId}
-                      </span>
-                    </div>
+                publicRooms.map((room: RoomListItem) => {
+                  const ruleBadge = room.rules?.preset === 'poker_jawa'
+                    ? { label: 'Poker Jawa', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' }
+                    : room.rules?.preset === 'custom'
+                    ? { label: 'Kustom', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' }
+                    : { label: 'Default Remi', color: 'bg-slate-700 text-slate-300 border-slate-600' };
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400">
-                        {room.playerCount}/4 pemain
-                      </span>
-                      <button
-                        onClick={() => onJoinRoom(room.roomId)}
-                        disabled={room.playerCount >= 4}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-xs cursor-pointer transition-all"
-                      >
-                        {room.playerCount >= 4 ? 'Penuh' : 'Masuk'}
-                      </button>
+                  return (
+                    <div
+                      key={room.roomId}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-200 block truncate max-w-[130px]">
+                            {room.roomName}
+                          </span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded border font-medium ${ruleBadge.color}`}>
+                            {ruleBadge.label}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-amber-400/80 font-mono">
+                          Kode: {room.roomId}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400">
+                          {room.playerCount}/{room.maxPlayers} pemain
+                        </span>
+                        <button
+                          onClick={() => onJoinRoom(room.roomId)}
+                          disabled={room.playerCount >= room.maxPlayers}
+                          className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-xs cursor-pointer transition-all"
+                        >
+                          {room.playerCount >= room.maxPlayers ? 'Penuh' : 'Masuk'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
 
           <div className="text-[11px] text-slate-500 text-center mt-4 pt-3 border-t border-slate-800">
-            Kombinasi resmi: Satuan, Pair, Tris, Bong (Four/SF), & Full House.
+            Mendukung 2 hingga 10 pemain dengan aturan Remi Default &amp; Poker Jawa.
           </div>
         </div>
       </div>

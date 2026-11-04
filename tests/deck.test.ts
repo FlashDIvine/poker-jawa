@@ -39,11 +39,36 @@ describe('Deck logic', () => {
 
   it('deals 13 cards to each of the 4 players', () => {
     const deck = shuffleDeck(createDeck());
-    const hands = dealDeck(deck);
+    const hands = dealDeck(deck, 4);
     expect(hands).toHaveLength(4);
     for (const hand of hands) {
       expect(hand).toHaveLength(13);
     }
+  });
+
+  it('deals 52 cards completely for 3 players (18, 17, 17 cards)', () => {
+    const deck = shuffleDeck(createDeck());
+    const hands = dealDeck(deck, 3);
+    expect(hands).toHaveLength(3);
+    expect(hands[0]).toHaveLength(18);
+    expect(hands[1]).toHaveLength(17);
+    expect(hands[2]).toHaveLength(17);
+    const totalDealt = hands.reduce((sum, h) => sum + h.length, 0);
+    expect(totalDealt).toBe(52);
+  });
+
+  it('deals 52 cards completely for 2 players (26 cards each)', () => {
+    const deck = shuffleDeck(createDeck());
+    const hands = dealDeck(deck, 2);
+    expect(hands).toHaveLength(2);
+    expect(hands[0]).toHaveLength(26);
+    expect(hands[1]).toHaveLength(26);
+    const totalDealt = hands.reduce((sum, h) => sum + h.length, 0);
+    expect(totalDealt).toBe(52);
+
+    // Verify all 52 cards are unique and distributed
+    const allIds = new Set([...hands[0].map(c => c.id), ...hands[1].map(c => c.id)]);
+    expect(allIds.size).toBe(52);
   });
 
   it('finds player holding 3 of Spades (3 Waru)', () => {

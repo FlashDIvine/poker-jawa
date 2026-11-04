@@ -8,6 +8,9 @@ interface PlayerSeatProps {
   timeMax?: number;
   position: 'bottom' | 'left' | 'top' | 'right';
   isSelf?: boolean;
+  isDealing?: boolean;
+  isGamePlaying?: boolean;
+  compact?: boolean;
 }
 
 export const PlayerSeat: React.FC<PlayerSeatProps> = ({
@@ -16,13 +19,19 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   timeRemaining = 15,
   timeMax = 15,
   position,
-  isSelf = false
+  isSelf = false,
+  isDealing = false,
+  isGamePlaying = false,
+  compact = false
 }) => {
   if (!player) {
+    if (isGamePlaying) return null;
     return (
-      <div className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/60 bg-slate-900/40 text-slate-500 w-28 h-28">
-        <span className="text-2xl">🪑</span>
-        <span className="text-xs mt-1">Kosong</span>
+      <div className={`flex flex-col items-center justify-center p-2 rounded-2xl border-2 border-dashed border-slate-700/60 bg-slate-900/40 text-slate-500 ${
+        compact ? 'w-16 h-16 sm:w-20 sm:h-20' : 'w-24 h-24 sm:w-28 sm:h-28'
+      }`}>
+        <span className={compact ? 'text-lg' : 'text-2xl'}>🪑</span>
+        <span className="text-[10px] sm:text-xs mt-0.5">Kosong</span>
       </div>
     );
   }
@@ -38,7 +47,11 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
         )}
 
         <div
-          className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-2xl sm:text-3xl shadow-lg border-2 ${
+          className={`relative rounded-full flex items-center justify-center shadow-lg border-2 ${
+            compact
+              ? 'w-9 h-9 sm:w-12 sm:h-12 text-base sm:text-xl landscape:w-8 landscape:h-8 landscape:sm:w-11 landscape:sm:h-11'
+              : 'w-11 h-11 sm:w-16 sm:h-16 text-xl sm:text-3xl landscape:w-9 landscape:h-9 landscape:sm:w-13 landscape:sm:h-13'
+          } ${
             isCurrentTurn
               ? 'border-yellow-300 bg-slate-900 shadow-amber-500/30'
               : 'border-slate-700 bg-slate-800'
@@ -81,17 +94,26 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
           </div>
         )}
 
+        {/* Finished / Winner Rank Badge */}
+        {player.finishRank && (
+          <span className="mt-1 bg-gradient-to-r from-amber-500 to-yellow-400 border border-yellow-200 text-slate-950 font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full shadow-md animate-bounce flex items-center gap-1 z-20">
+            <span>{player.finishRank === 1 ? '🥇' : player.finishRank === 2 ? '🥈' : player.finishRank === 3 ? '🥉' : '🏁'}</span>
+            <span>Juara {player.finishRank}</span>
+          </span>
+        )}
+
         {/* Pass Badge */}
-        {player.passed && (
-          <span className="mt-1 bg-rose-950/80 border border-rose-500/50 text-rose-300 font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm animate-bounce">
-            LEWAT
+        {!player.finishRank && player.passed && (
+          <span className="mt-1 bg-rose-950/90 border border-rose-500/60 text-rose-300 font-extrabold text-[10px] px-2 py-0.5 rounded-full shadow-sm animate-pass-knock flex items-center gap-1">
+            <span>↷</span>
+            <span>LEWAT</span>
           </span>
         )}
       </div>
 
       {/* Opponent Card Stack Fan (for non-self seats) */}
       {!isSelf && player.cardCount > 0 && (
-        <div className="flex items-center justify-center -space-x-8 mt-1.5 pointer-events-none scale-75 sm:scale-90">
+        <div className={`hidden sm:flex items-center justify-center -space-x-8 mt-1 pointer-events-none scale-75 sm:scale-90 transition-all ${isDealing ? 'animate-deal-hand' : ''}`}>
           {Array.from({ length: Math.min(5, player.cardCount) }).map((_, i) => (
             <PlayingCard
               key={i}
