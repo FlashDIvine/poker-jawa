@@ -290,7 +290,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
 
       {/* Floating AFK / AutoPlay Takeover Notification Toast (Positioned below top seats to avoid collision) */}
       {gameState.status === 'playing' && me?.isAutoPlay && (
-        <div className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-35 pointer-events-none w-auto max-w-[92vw]">
+        <div className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-35 pointer-events-none w-auto max-w-[92vw] compact-landscape-hide">
           <div
             onClick={onResumeControl}
             className="pointer-events-auto bg-gradient-to-r from-purple-950/95 via-indigo-950/95 to-purple-950/95 border border-purple-400/90 rounded-full px-3 sm:px-4 py-1 sm:py-1.5 shadow-2xl flex items-center gap-2 cursor-pointer active:scale-95 hover:bg-purple-900 transition-all backdrop-blur-md animate-fadeIn"
@@ -388,9 +388,9 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                 onResumeControl();
               }
             }}
-            className="relative flex-1 min-w-0 max-w-full sm:max-w-2xl md:max-w-3xl mx-auto rounded-[16px] sm:rounded-[36px] md:rounded-[48px] felt-border felt-border-mobile-landscape p-0.5 sm:p-1.5 md:p-2.5 shadow-xl"
+            className="relative flex-1 min-w-0 max-w-full sm:max-w-2xl md:max-w-3xl landscape:max-w-xl landscape:sm:max-w-xl landscape:md:max-w-2xl mx-auto rounded-[16px] sm:rounded-[36px] md:rounded-[48px] felt-border felt-border-mobile-landscape p-0.5 sm:p-1.5 md:p-2.5 shadow-xl"
           >
-            <div className="relative w-full rounded-[14px] sm:rounded-[28px] md:rounded-[40px] felt-table felt-table-mobile-landscape min-h-[85px] xs:min-h-[95px] sm:min-h-[190px] md:min-h-[250px] max-h-[175px] xs:max-h-[195px] sm:max-h-[320px] landscape:min-h-[85px] landscape:max-h-[160px] flex flex-col justify-center items-center p-1 xs:p-1.5 sm:p-4 landscape:p-1.5 landscape:sm:p-2 overflow-visible border border-emerald-400/20">
+            <div className="relative w-full rounded-[14px] sm:rounded-[28px] md:rounded-[40px] felt-table felt-table-mobile-landscape min-h-[85px] xs:min-h-[95px] sm:min-h-[190px] md:min-h-[250px] max-h-[175px] xs:max-h-[195px] sm:max-h-[320px] landscape:min-h-[75px] landscape:max-h-[135px] landscape:sm:min-h-[75px] landscape:sm:max-h-[135px] flex flex-col justify-center items-center p-1 xs:p-1.5 sm:p-4 landscape:p-1 landscape:sm:p-1.5 overflow-visible border border-emerald-400/20">
               {gameState.status === 'waiting' ? (
                 <div className="flex flex-col items-center justify-center p-3 sm:p-5 rounded-2xl bg-slate-950/60 border border-amber-500/30 text-center max-w-md backdrop-blur-md">
                   <span className="text-xl sm:text-2xl mb-0.5 text-amber-400">♠ ♣ ♦ ♥</span>

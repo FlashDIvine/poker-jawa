@@ -360,9 +360,13 @@
   animation: rotatePhoneAnimation 2.4s ease-in-out infinite;
 }
 
-/* Mobile Landscape Optimizations (height <= 520px in landscape mode) */
+/* Mobile Landscape & Small Frame Auto-Scaling Optimizations (height <= 520px) */
 @media (max-height: 520px) {
   .compact-landscape-hide {
+    display: none !important;
+  }
+
+  .compact-hide-profile {
     display: none !important;
   }
 
@@ -370,6 +374,49 @@
     width: 2rem !important; /* 32px */
     height: 2rem !important;
     font-size: 1rem !important;
+  }
+
+  .felt-table {
+    min-height: 75px !important;
+    max-height: 135px !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  .felt-border {
+    max-width: 82% !important;
+    padding: 2px !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* Extra small height frames (<= 400px) */
+@media (max-height: 400px) {
+  .compact-landscape-avatar {
+    width: 1.75rem !important; /* 28px */
+    height: 1.75rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  .felt-table {
+    min-height: 65px !important;
+    max-height: 115px !important;
+    padding: 0.15rem 0.35rem !important;
+  }
+
+  .felt-border {
+    max-width: 80% !important;
+  }
+}
+
+/* Ultra small height frames (<= 330px) */
+@media (max-height: 330px) {
+  .felt-table {
+    min-height: 55px !important;
+    max-height: 95px !important;
+  }
+
+  .felt-border {
+    max-width: 78% !important;
   }
 }
 
@@ -382,8 +429,8 @@
   .felt-table-mobile-landscape {
     border-radius: 14px !important;
     padding: 0.25rem 0.5rem !important;
-    min-height: 90px !important;
-    max-height: 155px !important;
+    min-height: 75px !important;
+    max-height: 135px !important;
   }
 
   .card-selected {

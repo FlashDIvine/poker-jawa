@@ -277,7 +277,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         {/* Mini Player Profile Tag */}
         {player && (
           <div
-            className={`shrink-0 flex items-center gap-1 sm:gap-1.5 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-xl border transition-all ${
+            className={`shrink-0 compact-hide-profile flex items-center gap-1 sm:gap-1.5 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-xl border transition-all ${
               isMyTurn
                 ? 'bg-amber-950/80 border-amber-400 text-amber-200 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
                 : 'bg-slate-900/80 border-slate-700/60 text-slate-300'
@@ -324,7 +324,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         )}
 
         {/* Quick Combo Scrollable Chips */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 ml-auto flex-1 min-w-0 justify-end">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 mx-auto flex-1 min-w-0 justify-center sm:justify-end">
           {comboOptions.filter(opt => opt.count > 0).map(opt => (
             <button
               key={opt.type}
