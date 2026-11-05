@@ -22,8 +22,8 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   disabled = false
 }) => {
   const sizeClasses = {
-    sm: 'w-8 h-12 sm:w-10 sm:h-14 text-[10px] sm:text-xs rounded-md',
-    md: 'w-12 h-[68px] sm:w-16 sm:h-24 text-xs sm:text-base rounded-lg landscape:w-12 landscape:h-[68px] landscape:sm:w-15 landscape:sm:h-22',
+    sm: 'w-7 h-10 sm:w-10 sm:h-14 text-[9px] sm:text-xs rounded-md',
+    md: 'w-10 h-[56px] sm:w-16 sm:h-24 text-[11px] sm:text-base rounded-lg landscape:w-9 landscape:h-[50px] landscape:sm:w-15 landscape:sm:h-22 landscape:text-[10px]',
     lg: 'w-14 h-20 sm:w-20 sm:h-28 text-sm sm:text-lg rounded-xl'
   };
 
@@ -87,7 +87,7 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
 
       {/* Center Large Suit Symbol */}
       <div className={`absolute inset-0 flex items-center justify-center font-serif-poker opacity-85 pointer-events-none ${textColor}`}>
-        <span className={`${size === 'sm' ? 'text-base' : size === 'md' ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'}`}>
+        <span className={`${size === 'sm' ? 'text-sm' : size === 'md' ? 'text-xl sm:text-3xl' : 'text-3xl sm:text-4xl'}`}>
           {card.suitSymbol}
         </span>
       </div>

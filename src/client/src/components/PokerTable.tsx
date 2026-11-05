@@ -199,9 +199,9 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   };
 
   return (
-    <div className="w-full min-h-screen landscape:min-h-screen landscape:h-screen flex flex-col justify-between bg-slate-950 text-slate-100 select-none pb-1 sm:pb-4 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
+    <div className="w-full min-h-screen landscape:min-h-screen landscape:h-screen flex flex-col justify-between bg-slate-950 text-slate-100 select-none pb-0.5 sm:pb-4 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
       {/* Top Navigation Bar */}
-      <header className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-1.5 sm:py-2.5 landscape:py-1 pt-[max(0.375rem,env(safe-area-inset-top,0px))] flex items-center justify-between shrink-0 z-20 border-b border-slate-800/60">
+      <header className="w-full max-w-6xl mx-auto px-1.5 sm:px-4 py-1 sm:py-2.5 landscape:py-0.5 pt-[max(0.375rem,env(safe-area-inset-top,0px))] flex items-center justify-between shrink-0 z-20 border-b border-slate-800/60">
         {/* Room Info & Code Badge */}
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <button
@@ -339,7 +339,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
       <main className="w-full max-w-6xl mx-auto px-1 sm:px-3 flex-1 min-h-0 flex flex-col justify-center my-0 sm:my-1">
         {/* Top Seats Exterior (Opponents outside green felt table) - Safe clearance from header */}
         {topOpponents.length > 0 && (
-          <div className="w-full flex justify-center items-center gap-1.5 sm:gap-3 z-10 flex-wrap pt-2.5 sm:pt-3.5 pb-0.5 landscape:pt-1.5 landscape:pb-0 min-h-[32px] sm:min-h-[48px] shrink-0">
+          <div className="w-full flex justify-center items-center gap-1 sm:gap-3 z-10 flex-wrap pt-2.5 sm:pt-3.5 pb-0.5 landscape:pt-1.5 landscape:pb-0 min-h-[32px] sm:min-h-[48px] shrink-0">
             {topOpponents.map(player => (
               <PlayerSeat
                 key={player.id}
@@ -388,9 +388,9 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                 onResumeControl();
               }
             }}
-            className="relative flex-1 min-w-0 max-w-full sm:max-w-2xl md:max-w-3xl mx-auto rounded-[18px] sm:rounded-[36px] md:rounded-[48px] felt-border p-0.5 sm:p-1.5 md:p-2.5 shadow-xl"
+            className="relative flex-1 min-w-0 max-w-full sm:max-w-2xl md:max-w-3xl mx-auto rounded-[16px] sm:rounded-[36px] md:rounded-[48px] felt-border felt-border-mobile-landscape p-0.5 sm:p-1.5 md:p-2.5 shadow-xl"
           >
-            <div className="relative w-full rounded-[16px] sm:rounded-[28px] md:rounded-[40px] felt-table min-h-[105px] sm:min-h-[190px] md:min-h-[250px] max-h-[220px] sm:max-h-[320px] landscape:min-h-[85px] landscape:max-h-[145px] flex flex-col justify-center items-center p-1.5 sm:p-4 overflow-hidden border border-emerald-400/20">
+            <div className="relative w-full rounded-[14px] sm:rounded-[28px] md:rounded-[40px] felt-table felt-table-mobile-landscape min-h-[85px] xs:min-h-[95px] sm:min-h-[190px] md:min-h-[250px] max-h-[175px] xs:max-h-[195px] sm:max-h-[320px] landscape:min-h-[75px] landscape:max-h-[135px] flex flex-col justify-center items-center p-1 xs:p-1.5 sm:p-4 overflow-hidden border border-emerald-400/20">
               {gameState.status === 'waiting' ? (
                 <div className="flex flex-col items-center justify-center p-3 sm:p-5 rounded-2xl bg-slate-950/60 border border-amber-500/30 text-center max-w-md backdrop-blur-md">
                   <span className="text-xl sm:text-2xl mb-0.5 text-amber-400">♠ ♣ ♦ ♥</span>
