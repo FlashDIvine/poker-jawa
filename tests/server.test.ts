@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import http from 'http';
 import express from 'express';
 import { Server } from 'socket.io';
@@ -1468,6 +1468,36 @@ describe('Server & WebSocket Integration', () => {
       expect(p1.isAutoPlay).toBe(false);
       expect(p1.connected).toBe(true);
 
+      room.cleanup();
+    });
+
+    it('schedules a longer thinking delay for bots on first turn when discardThrees is active', () => {
+      const mockIo = {
+        to: () => ({ emit: () => {} }),
+        sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+      } as any;
+
+      const room = new Room('BOT_FIRST_TURN_DELAY', 'Bot Delay Room', mockIo, {
+        fillWithBots: true,
+        turnTimerSeconds: 15
+      });
+
+      room.addPlayer('human1', 'Human Player');
+      room.startGame();
+
+      const bot = room.state.players.find(p => p.isBot)!;
+      room.state.currentTurnPlayerId = bot.id;
+      room.state.isFirstTurnOfGame = true;
+
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      room.triggerBotTurnIfNeeded();
+
+      const calls = setTimeoutSpy.mock.calls;
+      const botDelayCall = calls.find(call => typeof call[1] === 'number' && (call[1] as number) >= 5000);
+      expect(botDelayCall).toBeDefined();
+      expect((botDelayCall![1] as number)).toBeGreaterThanOrEqual(5200);
+
+      setTimeoutSpy.mockRestore();
       room.cleanup();
     });
   });

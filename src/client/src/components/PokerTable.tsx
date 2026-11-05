@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { GameState, Player } from '@shared/types.js';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Card, GameState, Player } from '@shared/types.js';
 import { PlayerSeat } from './PlayerSeat.js';
-import { CenterTable } from './CenterTable.js';
+import { CenterTable, DISCARDED_THREES } from './CenterTable.js';
+import { PlayingCard } from './PlayingCard.js';
 import { ActionPanel } from './ActionPanel.js';
 import { BooingBanner } from './BooingBanner.js';
 import { sortCards } from '@shared/deck.js';
@@ -49,6 +50,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   const [isMuted, setIsMuted] = useState(!sounds.enabled);
   const [isDealing, setIsDealing] = useState(false);
   const [isDiscardingThrees, setIsDiscardingThrees] = useState(false);
+  const [discardStep, setDiscardStep] = useState(4);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hintsEnabled, setHintsEnabled] = useState(gameState.rules?.allowHints !== false);
 
@@ -80,51 +82,83 @@ export const PokerTable: React.FC<PokerTableProps> = ({
 
   const prevStatusRef = useRef(gameState.status);
   const prevRoundRef = useRef(gameState.roundNumber);
+  const hasTriggeredInitialIntroRef = useRef(false);
 
   useEffect(() => {
     const isNewRound = prevRoundRef.current !== gameState.roundNumber;
     const isGameStarted = prevStatusRef.current !== 'playing' && gameState.status === 'playing';
+    const isInitialMountPlaying = !hasTriggeredInitialIntroRef.current && gameState.status === 'playing' && gameState.isFirstTurnOfGame && !gameState.lastPlay;
 
-    let dealTimer: any = null;
-    let discardTimer: any = null;
+    const timers: any[] = [];
 
-    if (gameState.status === 'playing' && (isGameStarted || isNewRound)) {
+    if (gameState.status === 'playing' && (isGameStarted || isNewRound || isInitialMountPlaying) && !gameState.lastPlay) {
+      hasTriggeredInitialIntroRef.current = true;
       setIsDealing(true);
       setIsDiscardingThrees(false);
+      setDiscardStep(0);
       sounds.playDeal();
 
-      // Tahap 1: Animasi pembagian kartu ke tangan pemain (1.1s)
-      dealTimer = setTimeout(() => {
+      // Tahap 1: Animasi pembagian kartu ke tangan pemain (0.9s)
+      const dealTimer = setTimeout(() => {
         setIsDealing(false);
 
-        // Tahap 2: Animasi pembuangan 4 kartu angka 3 ke tengah meja di awal game (2.4s)
+        // Tahap 2: Animasi pembuangan 4 kartu angka 3 ke tengah meja secara bergantian (sequential)
         if (gameState.rules?.discardThrees !== false) {
           setIsDiscardingThrees(true);
-          sounds.playCardSnap();
+          setDiscardStep(0); // Awalnya semua pemain memegang kartu 3 di kursi masing-masing (durasi 1.0s agar terlihat jelas)
 
-          discardTimer = setTimeout(() => {
+          // Kartu 1 dibuang ke tengah
+          const t1 = setTimeout(() => {
+            setDiscardStep(1);
+            sounds.playCardSnap();
+          }, 1000);
+          timers.push(t1);
+
+          // Kartu 2 dibuang ke tengah
+          const t2 = setTimeout(() => {
+            setDiscardStep(2);
+            sounds.playCardSnap();
+          }, 1850);
+          timers.push(t2);
+
+          // Kartu 3 dibuang ke tengah
+          const t3 = setTimeout(() => {
+            setDiscardStep(3);
+            sounds.playCardSnap();
+          }, 2700);
+          timers.push(t3);
+
+          // Kartu 4 (3♠ oleh pemegang pertama) dibuang ke tengah
+          const t4 = setTimeout(() => {
+            setDiscardStep(4);
+            sounds.playCardSnap();
+          }, 3550);
+          timers.push(t4);
+
+          // Selesai intro pembuangan kartu 3
+          const tDone = setTimeout(() => {
             setIsDiscardingThrees(false);
-          }, 2400);
+          }, 4900);
+          timers.push(tDone);
         }
-      }, 1100);
+      }, 900);
+      timers.push(dealTimer);
     }
 
     prevStatusRef.current = gameState.status;
     prevRoundRef.current = gameState.roundNumber;
 
     return () => {
-      if (dealTimer) clearTimeout(dealTimer);
-      if (discardTimer) clearTimeout(discardTimer);
+      timers.forEach(t => clearTimeout(t));
     };
-  }, [gameState.status, gameState.roundNumber, gameState.rules?.discardThrees]);
+  }, [gameState.status, gameState.roundNumber, gameState.rules?.discardThrees, gameState.isFirstTurnOfGame]);
 
-  // Jika kartu pertama sudah dikeluarkan ke meja oleh pemain/bot, langsung selesaikan intro agar meja aktif terlihat
+  // Jika kartu pertama sudah dikeluarkan ke meja oleh pemain/bot setelah intro, update discardStep
   useEffect(() => {
-    if (gameState.lastPlay) {
-      setIsDealing(false);
-      setIsDiscardingThrees(false);
+    if (gameState.lastPlay && !isDealing && !isDiscardingThrees) {
+      setDiscardStep(4);
     }
-  }, [gameState.lastPlay]);
+  }, [gameState.lastPlay, isDealing, isDiscardingThrees]);
 
   const me = gameState.players.find(p => p.id === myPlayerId) || gameState.players[0];
   const mySeatIdx = me?.seatIndex ?? 0;
@@ -164,6 +198,86 @@ export const PokerTable: React.FC<PokerTableProps> = ({
     topOpponents = opponents.slice(leftCount, leftCount + topCount);
     rightOpponents = opponents.slice(leftCount + topCount);
   }
+
+  const getPlayerPosition = (playerId: string): 'bottom' | 'top' | 'left' | 'right' => {
+    if (playerId === me?.id) return 'bottom';
+    if (topOpponents.some(p => p.id === playerId)) return 'top';
+    if (leftOpponents.some(p => p.id === playerId)) return 'left';
+    if (rightOpponents.some(p => p.id === playerId)) return 'right';
+    return 'top';
+  };
+
+  // Map 4 rank-3 cards to players and seats for the initial reveal and sequential discard
+  const { discardItems, assignedThrees } = useMemo(() => {
+    const lead = gameState.players.find(p => p.id === gameState.leadPlayerId) || gameState.players[0];
+    const others = gameState.players.filter(p => p.id !== lead?.id);
+
+    // Shuffle non-3S cards based on roundNumber and roomId so they are random yet consistent for all clients in the round
+    const pool = [DISCARDED_THREES[1], DISCARDED_THREES[2], DISCARDED_THREES[3]]; // 3C, 3D, 3H
+    const roundSeed = (gameState.roundNumber || 1) + (gameState.roomId ? gameState.roomId.charCodeAt(0) : 0);
+    const shuffledNonLead = [
+      pool[roundSeed % 3],
+      pool[(roundSeed + 1) % 3],
+      pool[(roundSeed + 2) % 3]
+    ];
+
+    const items: Array<{
+      card: Card;
+      playerId: string;
+      playerName: string;
+      fromPosition: 'bottom' | 'left' | 'top' | 'right';
+      order: number;
+    }> = [];
+
+    // Order 0, 1, 2: Random non-3S cards discarded by players
+    // Order 3: 3S (lead player, opening starter)
+
+    if (others.length >= 3) {
+      items.push({ card: shuffledNonLead[0], playerId: others[0].id, playerName: others[0].name, fromPosition: getPlayerPosition(others[0].id), order: 0 });
+      items.push({ card: shuffledNonLead[1], playerId: others[1].id, playerName: others[1].name, fromPosition: getPlayerPosition(others[1].id), order: 1 });
+      items.push({ card: shuffledNonLead[2], playerId: others[2].id, playerName: others[2].name, fromPosition: getPlayerPosition(others[2].id), order: 2 });
+    } else if (others.length === 2) {
+      items.push({ card: shuffledNonLead[0], playerId: others[0].id, playerName: others[0].name, fromPosition: getPlayerPosition(others[0].id), order: 0 });
+      items.push({ card: shuffledNonLead[1], playerId: others[1].id, playerName: others[1].name, fromPosition: getPlayerPosition(others[1].id), order: 1 });
+      items.push({ card: shuffledNonLead[2], playerId: others[0].id, playerName: others[0].name, fromPosition: getPlayerPosition(others[0].id), order: 2 });
+    } else if (others.length === 1) {
+      items.push({ card: shuffledNonLead[0], playerId: others[0].id, playerName: others[0].name, fromPosition: getPlayerPosition(others[0].id), order: 0 });
+      items.push({ card: shuffledNonLead[1], playerId: others[0].id, playerName: others[0].name, fromPosition: getPlayerPosition(others[0].id), order: 1 });
+      items.push({ card: shuffledNonLead[2], playerId: lead ? lead.id : others[0].id, playerName: lead ? lead.name : others[0].name, fromPosition: lead ? getPlayerPosition(lead.id) : 'top', order: 2 });
+    } else if (lead) {
+      items.push({ card: shuffledNonLead[0], playerId: lead.id, playerName: lead.name, fromPosition: getPlayerPosition(lead.id), order: 0 });
+      items.push({ card: shuffledNonLead[1], playerId: lead.id, playerName: lead.name, fromPosition: getPlayerPosition(lead.id), order: 1 });
+      items.push({ card: shuffledNonLead[2], playerId: lead.id, playerName: lead.name, fromPosition: getPlayerPosition(lead.id), order: 2 });
+    }
+
+    if (lead) {
+      items.push({ card: DISCARDED_THREES[0], playerId: lead.id, playerName: lead.name, fromPosition: getPlayerPosition(lead.id), order: 3 });
+    }
+
+    const byPlayer: Record<string, { card: Card; order: number }[]> = {};
+    items.forEach(it => {
+      if (!byPlayer[it.playerId]) byPlayer[it.playerId] = [];
+      byPlayer[it.playerId].push({ card: it.card, order: it.order });
+    });
+
+    return { discardItems: items, assignedThrees: byPlayer };
+  }, [gameState.players, gameState.leadPlayerId, gameState.roundNumber, gameState.roomId, topOpponents, leftOpponents, rightOpponents, me]);
+
+  const getPlayerThreeInfo = (playerId: string) => {
+    if (!isDiscardingThrees) return { card: null, isDiscarding: false, hasDiscarded: false };
+    const playerThrees = assignedThrees[playerId];
+    if (!playerThrees || playerThrees.length === 0) return { card: null, isDiscarding: false, hasDiscarded: false };
+
+    const current = playerThrees.find(t => discardStep <= t.order + 1) || playerThrees[playerThrees.length - 1];
+    const isDiscarding = discardStep === current.order + 1;
+    const hasDiscarded = discardStep > current.order + 1;
+
+    return {
+      card: current.card,
+      isDiscarding,
+      hasDiscarded
+    };
+  };
 
   // Compute which UI zone played the last trick relative to "me"
   const playedPlayer = gameState.players.find(p => p.id === gameState.lastPlay?.playerId);
@@ -370,57 +484,69 @@ export const PokerTable: React.FC<PokerTableProps> = ({
         {/* Top Seats Exterior (Opponents outside green felt table) - Safe clearance from header */}
         {topOpponents.length > 0 && (
           <div className="w-full flex justify-center items-center gap-1 sm:gap-3 z-10 flex-wrap pt-2.5 sm:pt-3.5 pb-0.5 landscape:pt-1.5 landscape:pb-0 min-h-[32px] sm:min-h-[48px] shrink-0">
-            {topOpponents.map(player => (
-              <PlayerSeat
-                key={player.id}
-                player={player}
-                isCurrentTurn={gameState.currentTurnPlayerId === player.id}
-                timeRemaining={gameState.turnTimeRemaining}
-                timeMax={gameState.turnTimerMax}
-                position="top"
-                isDealing={isDealing}
-                isGamePlaying={gameState.status === 'playing'}
-                compact={isCompact}
-                isBooed={isBooedPlayer(player.id)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Middle Row: Left Seats Exterior, Shrunk Center Felt Table, Right Seats Exterior */}
-        <div className="w-full flex items-center justify-between gap-1 sm:gap-2 my-auto landscape:my-0 z-10 px-1 sm:px-2 min-h-0">
-          {/* Left Seats Exterior (Opponents) */}
-          {leftOpponents.length > 0 ? (
-            <div className={`flex flex-col items-center justify-center gap-1 sm:gap-2 shrink-0 ${isCompact ? 'w-11 xs:w-13 sm:w-20' : 'w-12 xs:w-14 sm:w-24'}`}>
-              {leftOpponents.map(player => (
+            {topOpponents.map(player => {
+              const threeInfo = getPlayerThreeInfo(player.id);
+              return (
                 <PlayerSeat
                   key={player.id}
                   player={player}
                   isCurrentTurn={gameState.currentTurnPlayerId === player.id}
                   timeRemaining={gameState.turnTimeRemaining}
                   timeMax={gameState.turnTimerMax}
-                  position="left"
+                  position="top"
                   isDealing={isDealing}
                   isGamePlaying={gameState.status === 'playing'}
                   compact={isCompact}
                   isBooed={isBooedPlayer(player.id)}
+                  heldThreeCard={threeInfo.card}
+                  isDiscardingThree={threeInfo.isDiscarding}
+                  hasDiscardedThree={threeInfo.hasDiscarded}
                 />
-              ))}
+              );
+            })}
+          </div>
+        )}
+
+        {/* Middle Row: Left Seats Exterior, Spacious Center Felt Table, Right Seats Exterior */}
+        <div className="w-full flex items-center justify-between gap-1 sm:gap-2 my-auto landscape:my-0 z-10 px-1 sm:px-2 min-h-0">
+          {/* Left Seats Exterior (Opponents) */}
+          {leftOpponents.length > 0 ? (
+            <div className={`flex flex-col items-center justify-center gap-1 sm:gap-2 shrink-0 ${isCompact ? 'w-11 xs:w-13 sm:w-20' : 'w-12 xs:w-14 sm:w-24'}`}>
+              {leftOpponents.map(player => {
+                const threeInfo = getPlayerThreeInfo(player.id);
+                return (
+                  <PlayerSeat
+                    key={player.id}
+                    player={player}
+                    isCurrentTurn={gameState.currentTurnPlayerId === player.id}
+                    timeRemaining={gameState.turnTimeRemaining}
+                    timeMax={gameState.turnTimerMax}
+                    position="left"
+                    isDealing={isDealing}
+                    isGamePlaying={gameState.status === 'playing'}
+                    compact={isCompact}
+                    isBooed={isBooedPlayer(player.id)}
+                    heldThreeCard={threeInfo.card}
+                    isDiscardingThree={threeInfo.isDiscarding}
+                    hasDiscardedThree={threeInfo.hasDiscarded}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="w-1 sm:w-4 shrink-0" />
           )}
 
-          {/* Shrunk Elegant Casino Green Felt Table (Focus purely on card play & clean spacious look) */}
+          {/* Spacious Elegant Casino Green Felt Table (Not squished/gepeng, authentic rounded card table) */}
           <div
             onClick={() => {
               if (me?.isAutoPlay && onResumeControl) {
                 onResumeControl();
               }
             }}
-            className="relative flex-1 min-w-0 max-w-full sm:max-w-2xl md:max-w-3xl landscape:max-w-xl landscape:sm:max-w-xl landscape:md:max-w-2xl mx-auto rounded-[16px] sm:rounded-[36px] md:rounded-[48px] felt-border felt-border-mobile-landscape p-0.5 sm:p-1.5 md:p-2.5 shadow-xl"
+            className="relative flex-1 min-w-0 max-w-full sm:max-w-2xl md:max-w-3xl mx-auto rounded-[22px] sm:rounded-[40px] md:rounded-[52px] felt-border felt-border-mobile-landscape p-1 sm:p-2 md:p-3 shadow-xl shrink-0"
           >
-            <div className="relative w-full rounded-[14px] sm:rounded-[28px] md:rounded-[40px] felt-table felt-table-mobile-landscape min-h-[85px] xs:min-h-[95px] sm:min-h-[190px] md:min-h-[250px] max-h-[175px] xs:max-h-[195px] sm:max-h-[320px] landscape:min-h-[75px] landscape:max-h-[135px] landscape:sm:min-h-[75px] landscape:sm:max-h-[135px] flex flex-col justify-center items-center p-1 xs:p-1.5 sm:p-4 landscape:p-1 landscape:sm:p-1.5 overflow-visible border border-emerald-400/20">
+            <div className="relative w-full rounded-[18px] sm:rounded-[34px] md:rounded-[46px] felt-table felt-table-mobile-landscape min-h-[130px] xs:min-h-[150px] sm:min-h-[220px] md:min-h-[280px] max-h-[220px] xs:max-h-[260px] sm:max-h-[360px] md:max-h-[420px] flex flex-col justify-center items-center p-2 xs:p-2.5 sm:p-4 md:p-6 overflow-visible border border-emerald-400/20">
               {gameState.status === 'waiting' ? (
                 <div className="flex flex-col items-center justify-center p-3 sm:p-5 rounded-2xl bg-slate-950/60 border border-amber-500/30 text-center max-w-md backdrop-blur-md">
                   <span className="text-xl sm:text-2xl mb-0.5 text-amber-400">♠ ♣ ♦ ♥</span>
@@ -470,9 +596,12 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                   playedFrom={playedFrom}
                   isDealing={isDealing}
                   isDiscardingThrees={isDiscardingThrees}
+                  discardStep={discardStep}
+                  discardItems={discardItems}
                   onSkipIntro={() => {
                     setIsDealing(false);
                     setIsDiscardingThrees(false);
+                    setDiscardStep(4);
                   }}
                 />
               )}
@@ -482,20 +611,26 @@ export const PokerTable: React.FC<PokerTableProps> = ({
           {/* Right Seats Exterior (Opponents) */}
           {rightOpponents.length > 0 ? (
             <div className={`flex flex-col items-center justify-center gap-1 sm:gap-2 shrink-0 ${isCompact ? 'w-11 xs:w-13 sm:w-20' : 'w-12 xs:w-14 sm:w-24'}`}>
-              {rightOpponents.map(player => (
-                <PlayerSeat
-                  key={player.id}
-                  player={player}
-                  isCurrentTurn={gameState.currentTurnPlayerId === player.id}
-                  timeRemaining={gameState.turnTimeRemaining}
-                  timeMax={gameState.turnTimerMax}
-                  position="right"
-                  isDealing={isDealing}
-                  isGamePlaying={gameState.status === 'playing'}
-                  compact={isCompact}
-                  isBooed={isBooedPlayer(player.id)}
-                />
-              ))}
+              {rightOpponents.map(player => {
+                const threeInfo = getPlayerThreeInfo(player.id);
+                return (
+                  <PlayerSeat
+                    key={player.id}
+                    player={player}
+                    isCurrentTurn={gameState.currentTurnPlayerId === player.id}
+                    timeRemaining={gameState.turnTimeRemaining}
+                    timeMax={gameState.turnTimerMax}
+                    position="right"
+                    isDealing={isDealing}
+                    isGamePlaying={gameState.status === 'playing'}
+                    compact={isCompact}
+                    isBooed={isBooedPlayer(player.id)}
+                    heldThreeCard={threeInfo.card}
+                    isDiscardingThree={threeInfo.isDiscarding}
+                    hasDiscardedThree={threeInfo.hasDiscarded}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="w-1 sm:w-4 shrink-0" />
@@ -544,6 +679,8 @@ export const PokerTable: React.FC<PokerTableProps> = ({
               lastPlay={gameState.lastPlay}
               isFirstTurnOfGame={gameState.isFirstTurnOfGame}
               isDealing={isDealing}
+              isDiscardingThrees={isDiscardingThrees}
+              myHeldThree={me ? getPlayerThreeInfo(me.id) : null}
               rules={gameState.rules}
               player={me}
               turnTimeRemaining={gameState.turnTimeRemaining}

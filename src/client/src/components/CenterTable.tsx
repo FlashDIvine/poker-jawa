@@ -2,12 +2,19 @@ import React, { useMemo } from 'react';
 import { Card, PlayedTrick } from '@shared/types.js';
 import { PlayingCard } from './PlayingCard.js';
 
-const DISCARDED_THREES: Card[] = [
+export const DISCARDED_THREES: Card[] = [
   { id: '3S', rank: 3, suit: 'S', suitValue: 1, rankLabel: '3', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: true },
   { id: '3C', rank: 3, suit: 'C', suitValue: 2, rankLabel: '3', suitSymbol: '♣', suitName: 'Keriting', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
   { id: '3D', rank: 3, suit: 'D', suitValue: 3, rankLabel: '3', suitSymbol: '♦', suitName: 'Wajik', color: 'red', isPoker: false, isAce: false, isThreeSpades: false },
   { id: '3H', rank: 3, suit: 'H', suitValue: 4, rankLabel: '3', suitSymbol: '♥', suitName: 'Hati', color: 'red', isPoker: false, isAce: false, isThreeSpades: false }
 ];
+
+export interface DiscardItem {
+  card: Card;
+  playerName: string;
+  fromPosition: 'bottom' | 'left' | 'top' | 'right';
+  order: number;
+}
 
 interface CenterTableProps {
   lastPlay: PlayedTrick | null;
@@ -16,6 +23,8 @@ interface CenterTableProps {
   playedFrom?: 'bottom' | 'left' | 'top' | 'right';
   isDealing?: boolean;
   isDiscardingThrees?: boolean;
+  discardStep?: number;
+  discardItems?: DiscardItem[];
   onSkipIntro?: () => void;
 }
 
@@ -26,6 +35,8 @@ export const CenterTable: React.FC<CenterTableProps> = ({
   playedFrom = 'bottom',
   isDealing = false,
   isDiscardingThrees = false,
+  discardStep = 4,
+  discardItems,
   onSkipIntro
 }) => {
   if (isDealing && !lastPlay) {
@@ -58,6 +69,18 @@ export const CenterTable: React.FC<CenterTableProps> = ({
   }
 
   if (isDiscardingThrees && !lastPlay) {
+    const defaultItems: DiscardItem[] = [
+      { card: DISCARDED_THREES[1], playerName: 'Pemain 1', fromPosition: 'left', order: 0 },
+      { card: DISCARDED_THREES[2], playerName: 'Pemain 2', fromPosition: 'top', order: 1 },
+      { card: DISCARDED_THREES[3], playerName: 'Pemain 3', fromPosition: 'right', order: 2 },
+      { card: DISCARDED_THREES[0], playerName: leadPlayerName || 'Pemegang 3♠', fromPosition: 'bottom', order: 3 }
+    ];
+
+    const activeItems = (discardItems && discardItems.length > 0) ? discardItems : defaultItems;
+    const currentItem = (discardStep >= 1 && discardStep <= 4)
+      ? activeItems[discardStep - 1]
+      : null;
+
     return (
       <div
         onClick={onSkipIntro}
@@ -65,22 +88,59 @@ export const CenterTable: React.FC<CenterTableProps> = ({
         title="Ketuk untuk lanjut"
       >
         {/* Animated Flying 4 Threes into Center Table */}
-        <div className="flex items-center justify-center -space-x-3.5 xs:-space-x-3 sm:-space-x-4 my-1 sm:my-2">
-          <div className="animate-discard-3-s z-10"><PlayingCard card={DISCARDED_THREES[0]} size="sm" disabled={true} /></div>
-          <div className="animate-discard-3-c z-20"><PlayingCard card={DISCARDED_THREES[1]} size="sm" disabled={true} /></div>
-          <div className="animate-discard-3-d z-30"><PlayingCard card={DISCARDED_THREES[2]} size="sm" disabled={true} /></div>
-          <div className="animate-discard-3-h z-40"><PlayingCard card={DISCARDED_THREES[3]} size="sm" disabled={true} /></div>
+        <div className="flex items-center justify-center -space-x-3.5 xs:-space-x-3 sm:-space-x-4 my-1 sm:my-2 min-h-[58px] sm:min-h-[76px]">
+          {activeItems.map((item, index) => {
+            if (discardStep < item.order + 1) return null;
+            const isJustArrived = discardStep === item.order + 1;
+            const isSpades = item.card.isThreeSpades;
+            const animFrom = isJustArrived ? `animate-discard-from-${item.fromPosition}` : '';
+            const animSuit = `animate-discard-3-${item.card.suit.toLowerCase()}`;
+            const flameClass = (discardStep >= 4 && isSpades) ? 'animate-discard-flame' : '';
+
+            return (
+              <div
+                key={item.card.id}
+                className={`${isJustArrived ? `${animFrom} ${animSuit}` : animSuit} ${
+                  isSpades
+                    ? `z-40 ring-1 ring-amber-400/80 rounded-md shadow-lg shadow-amber-500/40 ${flameClass}`
+                    : `z-${(index + 1) * 10}`
+                }`}
+              >
+                <PlayingCard card={item.card} size="sm" disabled={true} />
+              </div>
+            );
+          })}
+
+          {/* If step 0, show collection message */}
+          {discardStep === 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-amber-300/90 font-medium py-3 animate-pulse">
+              <span>🃏</span>
+              <span>Mengumpulkan kartu angka 3 dari pemain...</span>
+            </div>
+          )}
         </div>
 
         {/* Badge and Explanatory Text */}
         <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/30 border border-amber-400 text-amber-300 text-[11px] sm:text-xs font-black animate-badge-pop shadow">
           <span>🔥</span>
-          <span>Pembuangan 4 Kartu Angka 3</span>
+          <span>
+            {discardStep >= 4
+              ? 'Pembuangan 4 Kartu Angka 3'
+              : discardStep === 0
+              ? 'Pemeriksaan Kartu Angka 3'
+              : `${discardStep} dari 4 Kartu 3 Dibuang`}
+          </span>
           <span>🔥</span>
         </div>
 
-        <p className="text-[10px] sm:text-xs text-amber-200/90 mt-1 font-semibold max-w-[260px]">
-          Semua kartu 3 dibuang ke meja! {leadPlayerName ? <><strong className="text-yellow-300">{leadPlayerName}</strong> memegang <strong>3♠</strong> dan jalan duluan.</> : 'Pemegang 3♠ jalan duluan.'}
+        <p className="text-[10px] sm:text-xs text-amber-200/90 mt-1 font-semibold max-w-[280px]">
+          {discardStep >= 4 ? (
+            <>Semua kartu 3 dibuang ke meja! {leadPlayerName ? <><strong className="text-yellow-300">{leadPlayerName}</strong> memegang <strong>3♠</strong> dan jalan duluan.</> : 'Pemegang 3♠ jalan duluan.'}</>
+          ) : currentItem ? (
+            <><strong className="text-yellow-300">{currentItem.playerName}</strong> membuang <strong>3{currentItem.card.suitSymbol}</strong> ke tengah meja...</>
+          ) : (
+            <>Kartu angka 3 dibuang satu per satu ke tengah meja sebelum permainan dimulai.</>
+          )}
         </p>
 
         {/* Visual skip affordance */}

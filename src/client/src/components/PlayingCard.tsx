@@ -88,7 +88,7 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
 
       {/* Center Large Suit Symbol */}
       <div className={`absolute inset-0 flex items-center justify-center font-serif-poker opacity-85 pointer-events-none ${textColor}`}>
-        <span className={`${size === 'sm' ? 'text-sm' : size === 'md' ? 'text-xl sm:text-3xl landscape:text-lg lg:landscape:text-3xl' : 'text-3xl sm:text-4xl'}`}>
+        <span className={`${size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : size === 'md' ? 'text-xl sm:text-3xl landscape:text-lg lg:landscape:text-3xl' : 'text-3xl sm:text-4xl'}`}>
           {card.suitSymbol}
         </span>
       </div>

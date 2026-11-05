@@ -540,9 +540,14 @@ export class Room {
     // Trigger if player is a bot or if human is currently disconnected or in auto-play (AFK takeover)
     if (currentPlayer.isBot || !currentPlayer.connected || currentPlayer.isAutoPlay) {
       // Natural thinking delay: bots play quickly (800-1300ms),
-      // but AFK humans get 2500-3300ms so they have ample time to tap and take back manual control!
+      // but on the first turn when discardThrees is active, wait (6000-6400ms)
+      // so the 4-step discard-3 animation finishes and is clearly seen by players!
       const delay = currentPlayer.isBot
-        ? Math.floor(Math.random() * 500) + 800
+        ? (this.state.isFirstTurnOfGame && this.rules.discardThrees !== false
+            ? Math.floor(Math.random() * 400) + 6000
+            : this.state.isFirstTurnOfGame
+            ? Math.floor(Math.random() * 400) + 1600
+            : Math.floor(Math.random() * 500) + 800)
         : Math.floor(Math.random() * 800) + 2500;
 
       this.botTimeout = setTimeout(() => {

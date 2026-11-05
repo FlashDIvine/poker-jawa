@@ -7,7 +7,39 @@ import { PlayerSeat } from '../src/client/src/components/PlayerSeat.js';
 import { CenterTable } from '../src/client/src/components/CenterTable.js';
 import { BooingBanner } from '../src/client/src/components/BooingBanner.js';
 import { GameOverModal } from '../src/client/src/components/GameOverModal.js';
+import { PlayingCard } from '../src/client/src/components/PlayingCard.js';
 import { Card, GameState, Player, POKER_JAWA_RULES, GameResult } from '../src/shared/types.js';
+
+const sharedMockGameState: GameState = {
+  roomId: 'TEST_RM',
+  roomName: 'Meja Uji Coba',
+  status: 'playing',
+  players: [
+    { id: 'me', name: 'Me', avatar: '🐱', isBot: false, cardCount: 5, hand: [{ id: 'c1', rank: 4, suit: 'S', rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', suitValue: 1, color: 'black', isPoker: false, isAce: false, isThreeSpades: false }], connected: true, isHost: true, seatIndex: 0, score: 0, isAutoPlay: false, passed: false },
+    { id: 'opp1', name: 'TopPlayer', avatar: '🦁', isBot: true, cardCount: 6, hand: [], connected: true, isHost: false, seatIndex: 1, score: 0, isAutoPlay: false, passed: false },
+    { id: 'opp2', name: 'LeftPlayer', avatar: '🐼', isBot: true, cardCount: 6, hand: [], connected: true, isHost: false, seatIndex: 2, score: 0, isAutoPlay: false, passed: false },
+    { id: 'opp3', name: 'RightPlayer', avatar: '🦊', isBot: true, cardCount: 6, hand: [], connected: true, isHost: false, seatIndex: 3, score: 0, isAutoPlay: false, passed: false }
+  ],
+  currentTurnPlayerId: 'me',
+  turnTimerMax: 15,
+  turnTimeRemaining: 15,
+  lastPlay: null,
+  trickHistory: [],
+  roundNumber: 1,
+  isFirstTurnOfGame: false,
+  leadPlayerId: null,
+  winnerId: null,
+  results: null,
+  consecutivePasses: 0,
+  finishers: [],
+  fillWithBots: true,
+  maxPlayers: 4,
+  rules: {
+    ...POKER_JAWA_RULES,
+    deckCount: 1,
+    allowHints: true
+  }
+};
 
 describe('UI Layout & Non-Overlapping Elements', () => {
   describe('ChatBox.tsx (Task Item 4)', () => {
@@ -811,6 +843,295 @@ describe('UI Layout & Non-Overlapping Elements', () => {
       expect(html).toContain('FastStarter');
       expect(html).toContain('Satuan 8♠');
       expect(html).not.toContain('Pembuangan 4 Kartu Angka 3');
+    });
+  });
+
+  describe('PokerTable.tsx Non-Gepeng Casino Table Dimensions', () => {
+    it('provides generous vertical height for authentic oval card table without squishing on landscape', async () => {
+      const { PokerTable } = await import('../src/client/src/components/PokerTable.js');
+      const html = renderToStaticMarkup(
+        React.createElement(PokerTable, {
+          gameState: sharedMockGameState,
+          myPlayerId: 'me',
+          onPlayCards: () => {},
+          onPassTurn: () => {},
+          onStartGame: () => {},
+          onLeaveRoom: () => {},
+          onOpenRules: () => {},
+          errorMessage: null,
+          onClearError: () => {}
+        })
+      );
+
+      // Must have spacious vertical height classes
+      expect(html).toContain('min-h-[130px] xs:min-h-[150px] sm:min-h-[220px] md:min-h-[280px]');
+      expect(html).toContain('max-h-[220px] xs:max-h-[260px] sm:max-h-[360px] md:max-h-[420px]');
+      // Must NOT contain landscape squishing caps that break desktop viewports
+      expect(html).not.toContain('landscape:max-h-[135px]');
+      expect(html).not.toContain('landscape:min-h-[75px]');
+      // Rounded casino border curvature
+      expect(html).toContain('rounded-[18px] sm:rounded-[34px] md:rounded-[46px]');
+    });
+  });
+
+  describe('Sequential Discard 3 Animation Flow', () => {
+    const mockThreeS = { id: '3S', rank: 3, suit: 'S' as const, suitValue: 1, rankLabel: '3', suitSymbol: '♠', suitName: 'Waru', color: 'black' as const, isPoker: false, isAce: false, isThreeSpades: true };
+    const mockThreeC = { id: '3C', rank: 3, suit: 'C' as const, suitValue: 2, rankLabel: '3', suitSymbol: '♣', suitName: 'Keriting', color: 'black' as const, isPoker: false, isAce: false, isThreeSpades: false };
+
+    it('displays collection message and no center cards at discardStep 0', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: true,
+          discardStep: 0,
+          leadPlayerName: 'Juara 3'
+        })
+      );
+
+      expect(html).toContain('Mengumpulkan kartu angka 3 dari pemain...');
+      expect(html).toContain('Pemeriksaan Kartu Angka 3');
+      expect(html).not.toContain('animate-discard-3-s');
+    });
+
+    it('renders cards accumulating sequentially from step 1 through step 4', () => {
+      // Step 1: 1 card
+      const htmlStep1 = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: true,
+          discardStep: 1,
+          leadPlayerName: 'Juara 3'
+        })
+      );
+      expect(htmlStep1).toContain('1 dari 4 Kartu 3 Dibuang');
+      expect(htmlStep1).toContain('animate-discard-3-c');
+      expect(htmlStep1).not.toContain('animate-discard-3-s');
+
+      // Step 2: 2 cards
+      const htmlStep2 = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: true,
+          discardStep: 2,
+          leadPlayerName: 'Juara 3'
+        })
+      );
+      expect(htmlStep2).toContain('2 dari 4 Kartu 3 Dibuang');
+      expect(htmlStep2).toContain('animate-discard-3-c');
+      expect(htmlStep2).toContain('animate-discard-3-d');
+      expect(htmlStep2).not.toContain('animate-discard-3-s');
+
+      // Step 3: 3 cards
+      const htmlStep3 = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: true,
+          discardStep: 3,
+          leadPlayerName: 'Juara 3'
+        })
+      );
+      expect(htmlStep3).toContain('3 dari 4 Kartu 3 Dibuang');
+      expect(htmlStep3).toContain('animate-discard-3-h');
+      expect(htmlStep3).not.toContain('animate-discard-3-s');
+
+      // Step 4: all 4 cards complete
+      const htmlStep4 = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: true,
+          discardStep: 4,
+          leadPlayerName: 'Juara 3'
+        })
+      );
+      expect(htmlStep4).toContain('Pembuangan 4 Kartu Angka 3');
+      expect(htmlStep4).toContain('animate-discard-3-s');
+      expect(htmlStep4).toContain('animate-discard-flame');
+      expect(htmlStep4).toContain('Juara 3');
+    });
+
+    it('renders held rank-3 card at PlayerSeat and applies directional departure animation', async () => {
+      const { PlayerSeat } = await import('../src/client/src/components/PlayerSeat.js');
+
+      // Holding phase (step 0)
+      const htmlHolding = renderToStaticMarkup(
+        React.createElement(PlayerSeat, {
+          player: sharedMockGameState.players[1],
+          isCurrentTurn: false,
+          position: 'top',
+          heldThreeCard: mockThreeC,
+          isDiscardingThree: false,
+          hasDiscardedThree: false
+        })
+      );
+      expect(htmlHolding).toContain('animate-badge-pop');
+      expect(htmlHolding).toContain('♣');
+
+      // Discarding departure phase from top seat
+      const htmlDiscardingTop = renderToStaticMarkup(
+        React.createElement(PlayerSeat, {
+          player: sharedMockGameState.players[1],
+          isCurrentTurn: false,
+          position: 'top',
+          heldThreeCard: mockThreeC,
+          isDiscardingThree: true,
+          hasDiscardedThree: false
+        })
+      );
+      expect(htmlDiscardingTop).toContain('animate-seat-discard-top');
+
+      // Left seat departure
+      const htmlDiscardingLeft = renderToStaticMarkup(
+        React.createElement(PlayerSeat, {
+          player: sharedMockGameState.players[2],
+          isCurrentTurn: false,
+          position: 'left',
+          heldThreeCard: mockThreeC,
+          isDiscardingThree: true,
+          hasDiscardedThree: false
+        })
+      );
+      expect(htmlDiscardingLeft).toContain('animate-seat-discard-left');
+
+      // Right seat departure with 3♠ highlight
+      const htmlDiscardingRight = renderToStaticMarkup(
+        React.createElement(PlayerSeat, {
+          player: sharedMockGameState.players[3],
+          isCurrentTurn: false,
+          position: 'right',
+          heldThreeCard: mockThreeS,
+          isDiscardingThree: true,
+          hasDiscardedThree: false
+        })
+      );
+      expect(htmlDiscardingRight).toContain('animate-seat-discard-right');
+      expect(htmlDiscardingRight).toContain('ring-2 ring-amber-400');
+    });
+
+    it('verifies CSS definitions for seat discard animations in index.css', async () => {
+      const fs = await import('fs');
+      const css = fs.readFileSync('src/client/src/index.css', 'utf-8');
+
+      expect(css).toContain('@keyframes seatDiscardTop');
+      expect(css).toContain('@keyframes seatDiscardBottom');
+      expect(css).toContain('@keyframes seatDiscardLeft');
+      expect(css).toContain('@keyframes seatDiscardRight');
+      expect(css).toContain('.animate-seat-discard-top');
+      expect(css).toContain('.animate-seat-discard-bottom');
+      expect(css).toContain('.animate-seat-discard-left');
+      expect(css).toContain('.animate-seat-discard-right');
+    });
+
+    it('verifies non-gepeng oval table styles and directional arrival animations in index.css', async () => {
+      const fs = await import('fs');
+      const css = fs.readFileSync('src/client/src/index.css', 'utf-8');
+
+      // Table width constraints to keep authentic oval casino aspect ratio (approx 2.1:1 - 2.3:1)
+      expect(css).toContain('max-width: min(50vw, 360px) !important;');
+      expect(css).toContain('min-height: 145px !important;');
+      expect(css).toContain('max-height: 185px !important;');
+      expect(css).toContain('border-radius: 76px !important;');
+      expect(css).toContain('border-radius: 72px !important;');
+
+      // Directional arrival animations
+      expect(css).toContain('.animate-discard-from-top');
+      expect(css).toContain('.animate-discard-from-bottom');
+      expect(css).toContain('.animate-discard-from-left');
+      expect(css).toContain('.animate-discard-from-right');
+    });
+
+    it('renders custom discardItems with directional seat arrival classes and player announcements', async () => {
+      const customItems = [
+        { card: mockThreeC, playerName: 'Pemain Kiri', fromPosition: 'left' as const, order: 0 },
+        { card: { ...mockThreeC, id: '3D', suit: 'D' as const, rankLabel: '3', suitSymbol: '♦', color: 'red' as const }, playerName: 'Pemain Atas', fromPosition: 'top' as const, order: 1 },
+        { card: { ...mockThreeC, id: '3H', suit: 'H' as const, rankLabel: '3', suitSymbol: '♥', color: 'red' as const }, playerName: 'Pemain Kanan', fromPosition: 'right' as const, order: 2 },
+        { card: mockThreeS, playerName: 'Pemain Bawah', fromPosition: 'bottom' as const, order: 3 }
+      ];
+
+      // Step 1: Card 1 from left
+      const htmlStep1 = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: true,
+          discardStep: 1,
+          discardItems: customItems,
+          leadPlayerName: 'Pemain Bawah'
+        })
+      );
+      expect(htmlStep1).toContain('animate-discard-from-left');
+      expect(htmlStep1).toContain('Pemain Kiri');
+      expect(htmlStep1).toContain('membuang');
+
+      // Step 4: Card 4 from bottom with 3♠ lead announcement
+      const htmlStep4 = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: true,
+          discardStep: 4,
+          discardItems: customItems,
+          leadPlayerName: 'Pemain Bawah'
+        })
+      );
+      expect(htmlStep4).toContain('animate-discard-from-bottom');
+      expect(htmlStep4).toContain('Pemain Bawah');
+      expect(htmlStep4).toContain('memegang');
+      expect(htmlStep4).toContain('3♠');
+    });
+
+    it('renders ActionPanel myHeldThree card spotlight and disables play button during discard intro', async () => {
+      const { ActionPanel } = await import('../src/client/src/components/ActionPanel.js');
+      const htmlActionPanel = renderToStaticMarkup(
+        React.createElement(ActionPanel, {
+          hand: [{ id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }],
+          selectedCardIds: ['4S'],
+          onToggleCard: () => {},
+          onSelectCards: () => {},
+          onClearSelection: () => {},
+          onPlaySelected: () => {},
+          onPass: () => {},
+          onSortToggle: () => {},
+          sortMode: 'rank',
+          isMyTurn: true,
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDiscardingThrees: true,
+          myHeldThree: {
+            card: mockThreeS,
+            isDiscarding: false,
+            hasDiscarded: false
+          }
+        })
+      );
+
+      // Must render rank 3 spotlight for self
+      expect(htmlActionPanel).toContain('Anda Memegang 3♠');
+      expect(htmlActionPanel).toContain('Membuang Kartu 3...');
+      expect(htmlActionPanel).toContain('disabled');
+    });
+
+    it('PlayingCard renders compact font size for size="xs" without overflowing', () => {
+      const htmlXs = renderToStaticMarkup(
+        React.createElement(PlayingCard, {
+          card: mockThreeS,
+          size: 'xs',
+          disabled: true
+        })
+      );
+      expect(htmlXs).toContain('text-xs');
+      expect(htmlXs).not.toContain('text-3xl');
     });
   });
 });

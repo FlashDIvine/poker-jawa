@@ -1,4 +1,4 @@
-import { Player } from '@shared/types.js';
+import { Card, Player } from '@shared/types.js';
 import { PlayingCard } from './PlayingCard.js';
 
 interface PlayerSeatProps {
@@ -13,6 +13,9 @@ interface PlayerSeatProps {
   compact?: boolean;
   isBooed?: boolean;
   onResumeControl?: () => void;
+  heldThreeCard?: Card | null;
+  isDiscardingThree?: boolean;
+  hasDiscardedThree?: boolean;
 }
 
 export const PlayerSeat: React.FC<PlayerSeatProps> = ({
@@ -26,7 +29,10 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   isGamePlaying = false,
   compact = false,
   isBooed = false,
-  onResumeControl
+  onResumeControl,
+  heldThreeCard,
+  isDiscardingThree = false,
+  hasDiscardedThree = false
 }) => {
   if (!player) {
     if (isGamePlaying) return null;
@@ -77,6 +83,33 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
             {player.cardCount}
           </div>
         </div>
+
+        {/* Rank 3 Card held at seat in opening discard sequence */}
+        {heldThreeCard && (
+          <div
+            className={`absolute z-30 transition-all duration-300 pointer-events-none ${
+              position === 'top'
+                ? '-bottom-10 sm:-bottom-12 left-1/2 -translate-x-1/2'
+                : position === 'left'
+                ? '-right-10 sm:-right-12 top-1/2 -translate-y-1/2'
+                : position === 'right'
+                ? '-left-10 sm:-left-12 top-1/2 -translate-y-1/2'
+                : '-top-10 sm:-top-12 left-1/2 -translate-x-1/2'
+            } ${
+              isDiscardingThree
+                ? `animate-seat-discard-${position}`
+                : hasDiscardedThree
+                ? 'opacity-0 scale-50 pointer-events-none'
+                : 'animate-badge-pop'
+            }`}
+          >
+            <div className={`transform shadow-xl ${
+              heldThreeCard.isThreeSpades ? 'ring-2 ring-amber-400 rounded-lg shadow-amber-400/60' : ''
+            }`}>
+              <PlayingCard card={heldThreeCard} size="sm" disabled={true} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Name & Bot/Human tag */}

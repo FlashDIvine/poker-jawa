@@ -21,6 +21,8 @@ interface ActionPanelProps {
   lastPlay: PlayedTrick | null;
   isFirstTurnOfGame: boolean;
   isDealing?: boolean;
+  isDiscardingThrees?: boolean;
+  myHeldThree?: { card: Card; isDiscarding: boolean; hasDiscarded: boolean } | null;
   rules?: GameRules;
   player?: Player;
   turnTimeRemaining?: number;
@@ -44,6 +46,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   lastPlay,
   isFirstTurnOfGame,
   isDealing = false,
+  isDiscardingThrees = false,
+  myHeldThree = null,
   rules = DEFAULT_RULES,
   player,
   turnTimeRemaining = 15,
@@ -352,6 +356,35 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         </div>
       </div>
 
+      {/* Opening Rank-3 Spotlight for Bottom Player ("me") */}
+      {isDiscardingThrees && myHeldThree && myHeldThree.card && !myHeldThree.hasDiscarded && (
+        <div className="w-full flex justify-center z-30 mb-0.5">
+          <div
+            className={`flex items-center gap-2 px-3 py-1 sm:py-1.5 rounded-2xl bg-slate-900/95 border shadow-2xl backdrop-blur-md transition-all ${
+              myHeldThree.card.isThreeSpades
+                ? 'border-amber-400 ring-2 ring-amber-400/60 shadow-amber-500/25'
+                : 'border-slate-700'
+            } ${
+              myHeldThree.isDiscarding
+                ? 'animate-seat-discard-bottom'
+                : 'animate-badge-pop'
+            }`}
+          >
+            <div className="shrink-0 shadow-md">
+              <PlayingCard card={myHeldThree.card} size="sm" disabled={true} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[11px] sm:text-xs font-bold text-amber-300">
+                {myHeldThree.card.isThreeSpades ? '🔥 Anda Memegang 3♠ (Membuka Permainan!)' : `Kartu 3 Anda: 3${myHeldThree.card.suitSymbol}`}
+              </span>
+              <span className="text-[9px] sm:text-[10px] text-slate-300">
+                {myHeldThree.isDiscarding ? 'Sedang dibuang ke tengah meja...' : 'Akan dibuang satu per satu ke tengah meja'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hand Cards Horizontal Display */}
       <div
         onClick={() => {
@@ -471,9 +504,11 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           {/* Primary Play Button */}
           <button
             onClick={handlePlayClick}
-            disabled={!player?.isAutoPlay && (!isMyTurn || !validation.valid)}
+            disabled={isDealing || isDiscardingThrees || (!player?.isAutoPlay && (!isMyTurn || !validation.valid))}
             className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-1.5 sm:py-2 rounded-xl font-black text-xs sm:text-sm shadow-lg transition-all duration-150 active:scale-95 ${
-              player?.isAutoPlay
+              isDealing || isDiscardingThrees
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
+                : player?.isAutoPlay
                 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/30 cursor-pointer ring-2 ring-yellow-300 animate-pulse'
                 : isMyTurn && validation.valid
                 ? isPokerSuicideMove
@@ -484,7 +519,11 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           >
             <Play className="w-3.5 h-3.5 fill-current shrink-0" />
             <span className="truncate max-w-[80px] xs:max-w-[140px] sm:max-w-none">
-              {player?.isAutoPlay
+              {isDealing
+                ? 'Membagikan...'
+                : isDiscardingThrees
+                ? 'Membuang Kartu 3...'
+                : player?.isAutoPlay
                 ? 'Ambil Alih (ON)'
                 : isPokerSuicideMove
                 ? 'Keluarkan (⚠️ Kalah Instan!)'

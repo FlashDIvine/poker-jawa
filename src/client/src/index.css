@@ -150,43 +150,77 @@
 .animate-deal-right { animation: dealFlyRight 0.65s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
 
 /* Discard 3 Opening Animations (Pembuangan Kartu 3 di Awal Game) */
+@keyframes seatDiscardTop {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { transform: translateY(30px) scale(1.1) rotate(6deg); opacity: 0.9; }
+  100% { transform: translateY(60px) scale(0.6) rotate(12deg); opacity: 0; }
+}
+
+@keyframes seatDiscardBottom {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { transform: translateY(-30px) scale(1.1) rotate(-6deg); opacity: 0.9; }
+  100% { transform: translateY(-60px) scale(0.6) rotate(-12deg); opacity: 0; }
+}
+
+@keyframes seatDiscardLeft {
+  0% { transform: translateX(0) scale(1); opacity: 1; }
+  50% { transform: translateX(30px) scale(1.1) rotate(8deg); opacity: 0.9; }
+  100% { transform: translateX(60px) scale(0.6) rotate(16deg); opacity: 0; }
+}
+
+@keyframes seatDiscardRight {
+  0% { transform: translateX(0) scale(1); opacity: 1; }
+  50% { transform: translateX(-30px) scale(1.1) rotate(-8deg); opacity: 0.9; }
+  100% { transform: translateX(-60px) scale(0.6) rotate(-16deg); opacity: 0; }
+}
+
+.animate-seat-discard-top { animation: seatDiscardTop 0.5s ease-in forwards; }
+.animate-seat-discard-bottom { animation: seatDiscardBottom 0.5s ease-in forwards; }
+.animate-seat-discard-left { animation: seatDiscardLeft 0.5s ease-in forwards; }
+.animate-seat-discard-right { animation: seatDiscardRight 0.5s ease-in forwards; }
+
 @keyframes discardCardFromBottom {
-  0% { transform: translateY(80px) scale(0.6) rotate(15deg); opacity: 0; }
-  65% { transform: translateY(-8px) scale(1.05) rotate(-3deg); opacity: 1; }
-  100% { transform: translateY(0) scale(1) rotate(-6deg); opacity: 1; }
+  0% { transform: translateY(120px) scale(0.6) rotate(15deg); opacity: 0; }
+  65% { transform: translateY(-10px) scale(1.1) rotate(-4deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(-5deg); opacity: 1; }
 }
 
 @keyframes discardCardFromLeft {
-  0% { transform: translateX(-90px) translateY(30px) scale(0.6) rotate(-20deg); opacity: 0; }
-  65% { transform: translateX(6px) translateY(-5px) scale(1.05) rotate(4deg); opacity: 1; }
+  0% { transform: translateX(-120px) translateY(30px) scale(0.6) rotate(-20deg); opacity: 0; }
+  65% { transform: translateX(10px) translateY(-6px) scale(1.1) rotate(4deg); opacity: 1; }
   100% { transform: translateX(0) translateY(0) scale(1) rotate(-2deg); opacity: 1; }
 }
 
 @keyframes discardCardFromTop {
-  0% { transform: translateY(-80px) scale(0.6) rotate(-15deg); opacity: 0; }
-  65% { transform: translateY(8px) scale(1.05) rotate(3deg); opacity: 1; }
+  0% { transform: translateY(-120px) scale(0.6) rotate(-15deg); opacity: 0; }
+  65% { transform: translateY(10px) scale(1.1) rotate(4deg); opacity: 1; }
   100% { transform: translateY(0) scale(1) rotate(2deg); opacity: 1; }
 }
 
 @keyframes discardCardFromRight {
-  0% { transform: translateX(90px) translateY(30px) scale(0.6) rotate(20deg); opacity: 0; }
-  65% { transform: translateX(-6px) translateY(-5px) scale(1.05) rotate(-4deg); opacity: 1; }
-  100% { transform: translateX(0) translateY(0) scale(1) rotate(6deg); opacity: 1; }
+  0% { transform: translateX(120px) translateY(30px) scale(0.6) rotate(20deg); opacity: 0; }
+  65% { transform: translateX(-10px) translateY(-6px) scale(1.1) rotate(-4deg); opacity: 1; }
+  100% { transform: translateX(0) translateY(0) scale(1) rotate(5deg); opacity: 1; }
 }
 
 @keyframes discardFlamePulse {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4), inset 0 0 10px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 18px rgba(245, 158, 11, 0.45), inset 0 0 12px rgba(239, 68, 68, 0.35);
   }
   50% {
-    box-shadow: 0 0 32px rgba(245, 158, 11, 0.8), inset 0 0 20px rgba(239, 68, 68, 0.6);
+    box-shadow: 0 0 36px rgba(245, 158, 11, 0.85), inset 0 0 24px rgba(239, 68, 68, 0.65);
   }
 }
 
+.animate-discard-from-bottom { animation: discardCardFromBottom 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
+.animate-discard-from-left { animation: discardCardFromLeft 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
+.animate-discard-from-top { animation: discardCardFromTop 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
+.animate-discard-from-right { animation: discardCardFromRight 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
+
 .animate-discard-3-s { animation: discardCardFromBottom 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
-.animate-discard-3-c { animation: discardCardFromLeft 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) 0.08s both; }
-.animate-discard-3-d { animation: discardCardFromTop 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) 0.16s both; }
-.animate-discard-3-h { animation: discardCardFromRight 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) 0.24s both; }
+.animate-discard-3-c { animation: discardCardFromLeft 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
+.animate-discard-3-d { animation: discardCardFromTop 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
+.animate-discard-3-h { animation: discardCardFromRight 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
 .animate-discard-flame { animation: discardFlamePulse 1.4s ease-in-out infinite; }
 
 /* Directional Card Placement (Naruh Kartu Sampe Ke Meja) Animations */
@@ -417,15 +451,16 @@
   }
 
   .felt-table {
-    min-height: 75px !important;
-    max-height: 135px !important;
-    padding: 0.25rem 0.5rem !important;
+    min-height: 120px !important;
+    max-height: 185px !important;
+    padding: 0.35rem 0.6rem !important;
+    border-radius: 32px !important;
   }
 
   .felt-border {
-    max-width: 82% !important;
-    padding: 2px !important;
-    border-radius: 16px !important;
+    max-width: min(58vw, 440px) !important;
+    padding: 3px !important;
+    border-radius: 36px !important;
   }
 }
 
@@ -438,39 +473,45 @@
   }
 
   .felt-table {
-    min-height: 65px !important;
-    max-height: 115px !important;
-    padding: 0.15rem 0.35rem !important;
+    min-height: 110px !important;
+    max-height: 165px !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 28px !important;
   }
 
   .felt-border {
-    max-width: 80% !important;
+    max-width: min(56vw, 420px) !important;
+    border-radius: 32px !important;
   }
 }
 
 /* Ultra small height frames (<= 330px) */
 @media (max-height: 330px) {
   .felt-table {
-    min-height: 55px !important;
-    max-height: 95px !important;
+    min-height: 95px !important;
+    max-height: 140px !important;
+    border-radius: 24px !important;
   }
 
   .felt-border {
-    max-width: 78% !important;
+    max-width: min(54vw, 360px) !important;
+    border-radius: 28px !important;
   }
 }
 
-@media (max-height: 520px) and (orientation: landscape) {
+@media (orientation: landscape) and (max-height: 600px) {
   .felt-border-mobile-landscape {
-    border-radius: 16px !important;
-    padding: 2px !important;
+    border-radius: 76px !important;
+    padding: 3px !important;
+    max-width: min(50vw, 360px) !important;
+    flex-shrink: 0 !important;
   }
 
   .felt-table-mobile-landscape {
-    border-radius: 14px !important;
-    padding: 0.25rem 0.5rem !important;
-    min-height: 75px !important;
-    max-height: 135px !important;
+    border-radius: 72px !important;
+    padding: 0.35rem 0.6rem !important;
+    min-height: 145px !important;
+    max-height: 185px !important;
   }
 
   .card-selected {
