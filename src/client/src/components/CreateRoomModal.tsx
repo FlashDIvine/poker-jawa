@@ -343,6 +343,16 @@ export const CreateRoomForm: React.FC<{
                 <span>Buang Semua Angka 3 di Awal (Pemegang 3♠ Jalan Duluan)</span>
               </label>
 
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rules.holdingPokerAsLastCardLoses !== false}
+                  onChange={(e) => updateRuleField('holdingPokerAsLastCardLoses', e.target.checked)}
+                  className="accent-amber-500 cursor-pointer"
+                />
+                <span>Kalah Otomatis jika Sisa Kartu 2 (Pegang kartu 2 terakhir langsung kalah telak)</span>
+              </label>
+
               <div className="flex items-center justify-between pt-1">
                 <span>Kartu Pembuka Putaran Pertama:</span>
                 <select

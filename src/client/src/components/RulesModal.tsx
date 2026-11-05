@@ -130,6 +130,17 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
               </div>
+
+              {/* Default Rule 5: Poker 2 Last Card Rule */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-red-950/40 to-slate-800/60 border border-red-500/40">
+                <div className="flex items-center gap-2 font-bold text-red-400 text-base mb-1">
+                  <span>👎</span>
+                  <span>5. Larangan Kartu 2 (Poker) Terakhir & Kalah Telak</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Pemain <strong className="text-rose-300">dilarang keras memegang kartu 2 (Poker) sebagai kartu terakhir</strong> di tangan, serta dilarang menutup/memenangkan permainan menggunakan kartu 2. Apabila seorang pemain hanya menyisakan kartu 2 di tangannya, pemain tersebut <strong className="text-yellow-300">LANGSUNG DINYATAKAN KALAH TELAK (Kena Booing)</strong> dan seluruh pemain lawan <strong className="text-emerald-300">LANGSUNG MENANG</strong>!
+                </p>
+              </div>
             </>
           ) : (
             <>
@@ -210,6 +221,17 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                     <strong className="text-amber-300">Royal Straight Flush (Level 6):</strong> Mengalahkan segala kartu di meja!
                   </div>
                 </div>
+              </div>
+
+              {/* Poker Jawa Rule 6: Poker 2 Last Card Rule */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-red-950/40 to-slate-800/60 border border-red-500/40">
+                <div className="flex items-center gap-2 font-bold text-red-400 text-base mb-1">
+                  <span>👎</span>
+                  <span>6. Larangan Kartu 2 (Poker) Terakhir & Kalah Telak</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Pemain dilarang memegang kartu 2 sebagai kartu terakhir di tangan. Jika hanya tersisa kartu 2 di tangan pemain, pemain tersebut <strong className="text-yellow-300">LANGSUNG KALAH TELAK</strong> dan pemain lain langsung menang!
+                </p>
               </div>
             </>
           )}

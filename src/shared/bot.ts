@@ -337,15 +337,30 @@ export function decideBotMove(
 
   // Case 2: Free lead (lastPlay is null) - Player won the trick and starts new round
   if (!lastPlay) {
+    // Helper to check if a move would leave the bot holding ONLY card 2 (causing instant loss)
+    const leavesOnlyPoker = (comboCards: Card[]): boolean => {
+      if (rules.holdingPokerAsLastCardLoses === false) return false;
+      const remaining = hand.filter(c => !comboCards.some(cp => cp.id === c.id));
+      return remaining.length > 0 && remaining.every(c => c.isPoker || c.rank === 15);
+    };
+
     // If entire hand forms a single valid combo (1 to 6 cards), dump them to win/clear!
     if (hand.length <= 6) {
       const direct = evaluateCombo(hand, rules);
-      if (direct) return hand;
+      if (direct) {
+        const finishesWithPoker = rules.holdingPokerAsLastCardLoses !== false && hand.some(c => c.isPoker || c.rank === 15);
+        if (!finishesWithPoker) {
+          return hand;
+        }
+      }
     }
 
     // Lead with smallest combos to shed lower cards
-    // Priority: Low 5-card pakets, low brother, low tris, low pairs, low singles
-    const nonPokerCombos = allCombos.filter(c => c.mainRank < 15);
+    // Filter out moves that leave only Poker cards if safe moves exist
+    const safeCombos = allCombos.filter(c => !leavesOnlyPoker(c.cards));
+    const pool = safeCombos.length > 0 ? safeCombos : allCombos;
+
+    const nonPokerCombos = pool.filter(c => c.mainRank < 15);
 
     // Try low Full House / Straight
     const lowPaket = nonPokerCombos.find(c => (c.type === 'FULL_HOUSE' || c.type === 'STRAIGHT') && c.mainRank <= 9);
@@ -364,8 +379,8 @@ export function decideBotMove(
     if (lowSingle) return lowSingle.cards;
 
     // If only poker/high combos left, play combo shedding maximum cards first
-    if (allCombos.length > 0) {
-      const sorted = [...allCombos].sort((a, b) => {
+    if (pool.length > 0) {
+      const sorted = [...pool].sort((a, b) => {
         if (a.mainRank !== b.mainRank) return a.mainRank - b.mainRank;
         return b.cards.length - a.cards.length;
       });
@@ -376,16 +391,33 @@ export function decideBotMove(
   }
 
   // Case 3: Responding to table lastPlay
-  const candidateCombos = allCombos.filter(c => canBeat(lastPlay.combo, c, rules));
+  let candidateCombos = allCombos.filter(c => canBeat(lastPlay.combo, c, rules));
 
   if (candidateCombos.length === 0) {
     return null; // Must pass
   }
 
+  // Filter out plays that leave the bot holding only card 2 (which causes instant loss)
+  const safeCandidates = candidateCombos.filter(c => {
+    if (rules.holdingPokerAsLastCardLoses === false) return true;
+    const remaining = hand.filter(card => !c.cards.some(cp => cp.id === card.id));
+    return !(remaining.length > 0 && remaining.every(card => card.isPoker || card.rank === 15));
+  });
+  if (safeCandidates.length > 0) {
+    candidateCombos = safeCandidates;
+  }
+
   // If bot is down to 1-3 cards, play immediately to finish
   if (hand.length <= 3) {
     // If any candidate combo empties the entire hand, play it immediately to win!
-    const finishingMove = candidateCombos.find(c => c.cards.length === hand.length);
+    // But do NOT finish with Poker 2 if holdingPokerAsLastCardLoses is active
+    const finishingMove = candidateCombos.find(c => {
+      if (c.cards.length !== hand.length) return false;
+      if (rules.holdingPokerAsLastCardLoses !== false && c.cards.some(card => card.isPoker || card.rank === 15)) {
+        return false;
+      }
+      return true;
+    });
     if (finishingMove) return finishingMove.cards;
 
     // Pick the lowest winning move

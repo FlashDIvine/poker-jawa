@@ -6,7 +6,8 @@ import { ActionPanel } from '../src/client/src/components/ActionPanel.js';
 import { PlayerSeat } from '../src/client/src/components/PlayerSeat.js';
 import { CenterTable } from '../src/client/src/components/CenterTable.js';
 import { BooingBanner } from '../src/client/src/components/BooingBanner.js';
-import { Card, GameState, Player, POKER_JAWA_RULES } from '../src/shared/types.js';
+import { GameOverModal } from '../src/client/src/components/GameOverModal.js';
+import { Card, GameState, Player, POKER_JAWA_RULES, GameResult } from '../src/shared/types.js';
 
 describe('UI Layout & Non-Overlapping Elements', () => {
   describe('ChatBox.tsx (Task Item 4)', () => {
@@ -345,6 +346,56 @@ describe('UI Layout & Non-Overlapping Elements', () => {
       );
       expect(htmlEmpty).toContain('min-w-[170px] xs:min-w-[200px] sm:min-w-[240px]');
     });
+
+    it('renders animated 4 rank-3 cards when isDiscardingThrees is true at round start', () => {
+      const htmlDiscarding = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: true,
+          leadPlayerName: 'Juara 3'
+        })
+      );
+
+      // Verify all 4 suit symbols are rendered
+      expect(htmlDiscarding).toContain('♠');
+      expect(htmlDiscarding).toContain('♣');
+      expect(htmlDiscarding).toContain('♦');
+      expect(htmlDiscarding).toContain('♥');
+
+      // Verify animations are applied
+      expect(htmlDiscarding).toContain('animate-discard-3-s');
+      expect(htmlDiscarding).toContain('animate-discard-3-c');
+      expect(htmlDiscarding).toContain('animate-discard-3-d');
+      expect(htmlDiscarding).toContain('animate-discard-3-h');
+      expect(htmlDiscarding).toContain('animate-discard-flame');
+
+      // Verify descriptive Indonesian badge & text
+      expect(htmlDiscarding).toContain('Pembuangan 4 Kartu Angka 3');
+      expect(htmlDiscarding).toContain('Juara 3');
+    });
+
+    it('renders opening discard pile preview on clean table before first move is made', () => {
+      const htmlOpening = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: null,
+          isFirstTurnOfGame: true,
+          isDealing: false,
+          isDiscardingThrees: false,
+          leadPlayerName: 'StarterPlayer'
+        })
+      );
+
+      expect(htmlOpening).toContain('Langkah Pembuka Permainan');
+      expect(htmlOpening).toContain('StarterPlayer');
+      expect(htmlOpening).toContain('Semua angka 3 telah dibuang!');
+      // Verify preview cards with all 4 suits are present
+      expect(htmlOpening).toContain('♠');
+      expect(htmlOpening).toContain('♣');
+      expect(htmlOpening).toContain('♦');
+      expect(htmlOpening).toContain('♥');
+    });
   });
 
   describe('BooingBanner.tsx (Task Item 5)', () => {
@@ -558,5 +609,210 @@ describe('UI Layout & Non-Overlapping Elements', () => {
       expect(html6P).toContain('w-11 xs:w-13 sm:w-20');
     });
   });
+
+  describe('GameOverModal.tsx (Task: Prevent Trophy Clipping & Clean Modal Layout)', () => {
+    const mockResults: GameResult[] = [
+      {
+        playerId: 'p1',
+        playerName: 'Juara Utama',
+        avatar: '👑',
+        isBot: false,
+        rank: 1,
+        remainingCards: 0,
+        scoreDelta: 30,
+        isWinner: true,
+        caughtHoldingPoker: false
+      },
+      {
+        playerId: 'p2',
+        playerName: 'Pemain Dua',
+        avatar: '🦊',
+        isBot: true,
+        rank: 2,
+        remainingCards: 3,
+        scoreDelta: 10,
+        isWinner: false,
+        caughtHoldingPoker: false
+      },
+      {
+        playerId: 'p3',
+        playerName: 'Pemain Kena Poker',
+        avatar: '🤖',
+        isBot: true,
+        rank: 3,
+        remainingCards: 1,
+        scoreDelta: -2,
+        isWinner: false,
+        caughtHoldingPoker: true,
+        pokerCardsCount: 1
+      }
+    ];
+
+    it('does NOT apply negative margin on the trophy badge to prevent top edge clipping', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          results: mockResults,
+          winnerId: 'p1',
+          isHost: true,
+          onPlayAgain: () => {},
+          onLeaveRoom: () => {}
+        })
+      );
+
+      // Must NOT use -mt-10 or -mt-14 which causes the trophy circle to be cut in half by overflow-y-auto
+      expect(html).not.toContain('-mt-10');
+      expect(html).not.toContain('-mt-14');
+
+      // Outer backdrop should have overflow-y-auto so dialog never overflows screen
+      expect(html).toContain('fixed inset-0 z-50 flex items-center justify-center');
+      expect(html).toContain('overflow-y-auto');
+
+      // Trophy and modal elements are present
+      expect(html).toContain('Permainan Berakhir!');
+      expect(html).toContain('Juara Utama');
+      expect(html).toContain('Main Lagi');
+      expect(html).toContain('Lobi');
+    });
+
+    it('renders Booing Banner inside modal when players were caught holding poker cards', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          results: mockResults,
+          winnerId: 'p1',
+          isHost: false,
+          onPlayAgain: () => {},
+          onLeaveRoom: () => {}
+        })
+      );
+
+      expect(html).toContain('HUUUUUU! KENA BOOING!');
+      expect(html).toContain('Pemain Kena Poker');
+      expect(html).toContain('Kartu Poker (2)');
+      expect(html).toContain('Soraki Huuuuuu Lagi!');
+    });
+
+    it('renders accurate winner subtitle when winner won due to instant loss while still holding cards', () => {
+      const instantWinResults: GameResult[] = [
+        {
+          playerId: 'p1',
+          playerName: 'Juara Tanpa Habis Kartu',
+          avatar: '👑',
+          isBot: false,
+          rank: 1,
+          remainingCards: 5,
+          scoreDelta: 30,
+          isWinner: true,
+          caughtHoldingPoker: false
+        },
+        {
+          playerId: 'p2',
+          playerName: 'Pemain Kena Poker',
+          avatar: '🤖',
+          isBot: true,
+          rank: 2,
+          remainingCards: 1,
+          scoreDelta: -2,
+          isWinner: false,
+          caughtHoldingPoker: true
+        }
+      ];
+
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          results: instantWinResults,
+          winnerId: 'p1',
+          isHost: true,
+          onPlayAgain: () => {},
+          onLeaveRoom: () => {}
+        })
+      );
+
+      // Must NOT say "berhasil menghabiskan seluruh kartu" because winner still has 5 cards
+      expect(html).not.toContain('berhasil menghabiskan seluruh kartu');
+      // Should say "keluar sebagai pemenang pertandingan"
+      expect(html).toContain('keluar sebagai pemenang pertandingan!');
+      expect(html).toContain('Juara Tanpa Habis Kartu');
+    });
+
+    it('returns null when results is null', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(GameOverModal, {
+          results: null,
+          winnerId: null,
+          isHost: false,
+          onPlayAgain: () => {},
+          onLeaveRoom: () => {}
+        })
+      );
+
+      expect(html).toBe('');
+    });
+  });
+
+  describe('ActionPanel.tsx Poker Instant Loss Warning', () => {
+    it('displays warning badge and red button style when a player selects card 2 to empty hand', () => {
+      const pokerCard = {
+        id: '2S',
+        rank: 15,
+        suit: 'S' as const,
+        suitValue: 1,
+        rankLabel: '2',
+        suitSymbol: '♠',
+        suitName: 'Waru',
+        color: 'black' as const,
+        isPoker: true,
+        isAce: false,
+        isThreeSpades: false
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(ActionPanel, {
+          hand: [pokerCard],
+          selectedCardIds: ['2S'],
+          onToggleCard: () => {},
+          onSelectCards: () => {},
+          onClearSelection: () => {},
+          onPlaySelected: () => {},
+          onPass: () => {},
+          onSortToggle: () => {},
+          sortMode: 'rank',
+          isMyTurn: true,
+          lastPlay: null,
+          isFirstTurnOfGame: false,
+          rules: { holdingPokerAsLastCardLoses: true } as any
+        })
+      );
+
+      expect(html).toContain('Keluarkan (⚠️ Kalah Instan!)');
+      expect(html).toContain('from-red-600 to-rose-700');
+    });
+  });
+
+  describe('CenterTable.tsx Intro vs Active Play Priority', () => {
+    it('immediately renders played trick even if isDiscardingThrees flag is still active', () => {
+      const mockTrick = {
+        cards: [{ id: '8S', rank: 8, suit: 'S' as const, suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black' as const, isPoker: false, isAce: false, isThreeSpades: false }],
+        playerId: 'p1',
+        playerName: 'FastStarter',
+        combo: { type: 'SINGLE' as const, mainRank: 8, description: 'Satuan 8♠', cards: [{ id: '8S', rank: 8, suit: 'S' as const, suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black' as const, isPoker: false, isAce: false, isThreeSpades: false }] },
+        timestamp: Date.now()
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(CenterTable, {
+          lastPlay: mockTrick,
+          isFirstTurnOfGame: false,
+          isDiscardingThrees: true,
+          leadPlayerName: 'FastStarter'
+        })
+      );
+
+      // Should show the played trick cards and FastStarter name, NOT the discard 3 banner
+      expect(html).toContain('FastStarter');
+      expect(html).toContain('Satuan 8♠');
+      expect(html).not.toContain('Pembuangan 4 Kartu Angka 3');
+    });
+  });
 });
+
 

@@ -5,7 +5,7 @@ interface PlayingCardProps {
   faceDown?: boolean;
   selected?: boolean;
   onClick?: () => void;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   className?: string;
   style?: React.CSSProperties;
   disabled?: boolean;
@@ -22,6 +22,7 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   disabled = false
 }) => {
   const sizeClasses = {
+    xs: 'w-6 h-8.5 sm:w-8 sm:h-11 text-[8px] sm:text-[10px] rounded-sm',
     sm: 'w-7 h-10 sm:w-10 sm:h-14 text-[9px] sm:text-xs rounded-md',
     md: 'w-10 h-[56px] sm:w-16 sm:h-24 text-[11px] sm:text-base rounded-lg landscape:w-9.5 landscape:h-[52px] landscape:sm:w-10 landscape:sm:h-[54px] lg:landscape:w-15 lg:landscape:h-22 landscape:text-[10px] lg:landscape:text-base',
     lg: 'w-14 h-20 sm:w-20 sm:h-28 text-sm sm:text-lg rounded-xl'

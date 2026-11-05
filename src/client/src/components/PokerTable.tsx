@@ -48,6 +48,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   const [copiedCode, setCopiedCode] = useState(false);
   const [isMuted, setIsMuted] = useState(!sounds.enabled);
   const [isDealing, setIsDealing] = useState(false);
+  const [isDiscardingThrees, setIsDiscardingThrees] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hintsEnabled, setHintsEnabled] = useState(gameState.rules?.allowHints !== false);
 
@@ -84,17 +85,46 @@ export const PokerTable: React.FC<PokerTableProps> = ({
     const isNewRound = prevRoundRef.current !== gameState.roundNumber;
     const isGameStarted = prevStatusRef.current !== 'playing' && gameState.status === 'playing';
 
+    let dealTimer: any = null;
+    let discardTimer: any = null;
+
     if (gameState.status === 'playing' && (isGameStarted || isNewRound)) {
       setIsDealing(true);
+      setIsDiscardingThrees(false);
       sounds.playDeal();
-      const timer = setTimeout(() => {
+
+      // Tahap 1: Animasi pembagian kartu ke tangan pemain (1.1s)
+      dealTimer = setTimeout(() => {
         setIsDealing(false);
-      }, 1300);
-      return () => clearTimeout(timer);
+
+        // Tahap 2: Animasi pembuangan 4 kartu angka 3 ke tengah meja di awal game (2.4s)
+        if (gameState.rules?.discardThrees !== false) {
+          setIsDiscardingThrees(true);
+          sounds.playCardSnap();
+
+          discardTimer = setTimeout(() => {
+            setIsDiscardingThrees(false);
+          }, 2400);
+        }
+      }, 1100);
     }
+
     prevStatusRef.current = gameState.status;
     prevRoundRef.current = gameState.roundNumber;
-  }, [gameState.status, gameState.roundNumber]);
+
+    return () => {
+      if (dealTimer) clearTimeout(dealTimer);
+      if (discardTimer) clearTimeout(discardTimer);
+    };
+  }, [gameState.status, gameState.roundNumber, gameState.rules?.discardThrees]);
+
+  // Jika kartu pertama sudah dikeluarkan ke meja oleh pemain/bot, langsung selesaikan intro agar meja aktif terlihat
+  useEffect(() => {
+    if (gameState.lastPlay) {
+      setIsDealing(false);
+      setIsDiscardingThrees(false);
+    }
+  }, [gameState.lastPlay]);
 
   const me = gameState.players.find(p => p.id === myPlayerId) || gameState.players[0];
   const mySeatIdx = me?.seatIndex ?? 0;
@@ -439,6 +469,11 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                   leadPlayerName={gameState.players.find(p => p.id === gameState.leadPlayerId)?.name}
                   playedFrom={playedFrom}
                   isDealing={isDealing}
+                  isDiscardingThrees={isDiscardingThrees}
+                  onSkipIntro={() => {
+                    setIsDealing(false);
+                    setIsDiscardingThrees(false);
+                  }}
                 />
               )}
             </div>

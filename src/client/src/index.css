@@ -149,6 +149,46 @@
 .animate-deal-top { animation: dealFlyTop 0.65s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
 .animate-deal-right { animation: dealFlyRight 0.65s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
 
+/* Discard 3 Opening Animations (Pembuangan Kartu 3 di Awal Game) */
+@keyframes discardCardFromBottom {
+  0% { transform: translateY(80px) scale(0.6) rotate(15deg); opacity: 0; }
+  65% { transform: translateY(-8px) scale(1.05) rotate(-3deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(-6deg); opacity: 1; }
+}
+
+@keyframes discardCardFromLeft {
+  0% { transform: translateX(-90px) translateY(30px) scale(0.6) rotate(-20deg); opacity: 0; }
+  65% { transform: translateX(6px) translateY(-5px) scale(1.05) rotate(4deg); opacity: 1; }
+  100% { transform: translateX(0) translateY(0) scale(1) rotate(-2deg); opacity: 1; }
+}
+
+@keyframes discardCardFromTop {
+  0% { transform: translateY(-80px) scale(0.6) rotate(-15deg); opacity: 0; }
+  65% { transform: translateY(8px) scale(1.05) rotate(3deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(2deg); opacity: 1; }
+}
+
+@keyframes discardCardFromRight {
+  0% { transform: translateX(90px) translateY(30px) scale(0.6) rotate(20deg); opacity: 0; }
+  65% { transform: translateX(-6px) translateY(-5px) scale(1.05) rotate(-4deg); opacity: 1; }
+  100% { transform: translateX(0) translateY(0) scale(1) rotate(6deg); opacity: 1; }
+}
+
+@keyframes discardFlamePulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4), inset 0 0 10px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 32px rgba(245, 158, 11, 0.8), inset 0 0 20px rgba(239, 68, 68, 0.6);
+  }
+}
+
+.animate-discard-3-s { animation: discardCardFromBottom 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) both; }
+.animate-discard-3-c { animation: discardCardFromLeft 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) 0.08s both; }
+.animate-discard-3-d { animation: discardCardFromTop 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) 0.16s both; }
+.animate-discard-3-h { animation: discardCardFromRight 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.25) 0.24s both; }
+.animate-discard-flame { animation: discardFlamePulse 1.4s ease-in-out infinite; }
+
 /* Directional Card Placement (Naruh Kartu Sampe Ke Meja) Animations */
 @keyframes cardPlaceFromBottom {
   0% {

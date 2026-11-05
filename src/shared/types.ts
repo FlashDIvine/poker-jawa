@@ -68,6 +68,7 @@ export interface GameRules {
   openingCard: '3S' | '3D' | 'any_3';   // Kartu pembuka: 3 Waru (3♠) / 3 Wajik (3♦) / bebas angka 3
   deckCount: 1;                         // Strictly 1 dek (52 kartu) selalu
   discardThrees?: boolean;              // Di awal game semua angka 3 dibuang dan pemegang 3 Waru (3♠) jalan duluan
+  holdingPokerAsLastCardLoses?: boolean; // Pemegang kartu 2 (Poker) sebagai kartu terakhir langsung kalah telak dan pemain lain langsung menang
   allowHints?: boolean;                 // Izinkan tombol saran kombinasi (Hint)
 }
 
@@ -93,6 +94,7 @@ export const DEFAULT_RULES: GameRules = {
   openingCard: '3S',
   deckCount: 1,
   discardThrees: true,
+  holdingPokerAsLastCardLoses: true,
   allowHints: true
 };
 
@@ -118,6 +120,7 @@ export const POKER_JAWA_RULES: GameRules = {
   openingCard: '3D',
   deckCount: 1,
   discardThrees: false,
+  holdingPokerAsLastCardLoses: true,
   allowHints: true
 };
 

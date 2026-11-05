@@ -61,6 +61,16 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
   const canPass = isMyTurn && !isFirstTurnOfGame && lastPlay !== null;
 
+  const isPokerSuicideMove = useMemo(() => {
+    if (rules.holdingPokerAsLastCardLoses === false || selectedCards.length === 0 || !validation.valid) {
+      return false;
+    }
+    const finishesWithPoker = hand.length === selectedCards.length && selectedCards.some(c => c.isPoker || c.rank === 15);
+    const remaining = hand.filter(c => !selectedCardIds.includes(c.id));
+    const leavesOnlyPoker = remaining.length > 0 && remaining.every(c => c.isPoker || c.rank === 15);
+    return finishesWithPoker || leavesOnlyPoker;
+  }, [hand, selectedCards, selectedCardIds, validation.valid, rules.holdingPokerAsLastCardLoses]);
+
   // Auto-detect all combinations available in hand based on active rules
   const allCombos = useMemo(() => findAllPossibleCombos(hand, rules), [hand, rules]);
 
@@ -466,7 +476,9 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
               player?.isAutoPlay
                 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/30 cursor-pointer ring-2 ring-yellow-300 animate-pulse'
                 : isMyTurn && validation.valid
-                ? 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/30 cursor-pointer ring-2 ring-yellow-300 scale-102'
+                ? isPokerSuicideMove
+                  ? 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white shadow-red-600/30 cursor-pointer ring-2 ring-red-400 scale-102 animate-pulse'
+                  : 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/30 cursor-pointer ring-2 ring-yellow-300 scale-102'
                 : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
             }`}
           >
@@ -474,6 +486,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             <span className="truncate max-w-[80px] xs:max-w-[140px] sm:max-w-none">
               {player?.isAutoPlay
                 ? 'Ambil Alih (ON)'
+                : isPokerSuicideMove
+                ? 'Keluarkan (⚠️ Kalah Instan!)'
                 : validation.valid && validation.combo
                 ? `Keluarkan (${validation.combo.description})`
                 : selectedCardIds.length > 0

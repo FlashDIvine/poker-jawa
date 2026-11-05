@@ -37,6 +37,7 @@ export class Room {
       ...DEFAULT_RULES,
       deckCount: 1,
       discardThrees: true,
+      holdingPokerAsLastCardLoses: true,
       ...(options?.rules || {})
     };
     this.rules.deckCount = 1;
@@ -309,6 +310,18 @@ export class Room {
 
     // Check if THIS player just ran out of cards!
     if (player.hand.length === 0 && !player.finishRank) {
+      // Sesuai aturan default: jika pemain memegang kartu 2 (Poker) sebagai kartu terakhir untuk menutup game,
+      // dia langsung dinyatakan kalah telak dan seluruh pemain lain langsung menang!
+      const isPokerFinish = playedCards.some(c => c.isPoker || c.rank === 15);
+      if (this.rules.holdingPokerAsLastCardLoses !== false && isPokerFinish) {
+        player.hand = playedCards; // Kembalikan kartu untuk perhitungan penalti kartu poker
+        player.cardCount = player.hand.length;
+        this.broadcastSystemChat(
+          `💥 HUUUUUU! 👎 ${player.name} memegang kartu 2 (Poker) sebagai kartu terakhir! Sesuai aturan, ${player.name} langsung dinyatakan kalah telak dan pemain lain langsung menang!`
+        );
+        this.handleGameOver(player.id);
+        return { success: true };
+      }
       const rank = this.finishers.length + 1;
       player.finishRank = rank;
       this.finishers.push(player.id);
@@ -559,7 +572,7 @@ export class Room {
     }
   }
 
-  private handleGameOver(): void {
+  private handleGameOver(instantPokerLoserId?: string): void {
     if (this.turnInterval) {
       clearInterval(this.turnInterval);
       this.turnInterval = null;
@@ -577,33 +590,51 @@ export class Room {
     // 2. Pemain yang masih memegang sisa kartu saat permainan berakhir
     const remainingPlayers = this.state.players.filter(p => p.hand.length > 0);
 
-    // Pisahkan pemain yang tidak memegang poker vs yang memegang kartu poker (angka 2)
-    const remainingWithoutPoker = remainingPlayers.filter(
-      p => !p.hand.some(c => c.isPoker || c.rank === 15)
-    );
-    const remainingWithPoker = remainingPlayers.filter(
-      p => p.hand.some(c => c.isPoker || c.rank === 15)
-    );
+    let finalOrder: Player[] = [];
+    let pokerLosers: Player[] = [];
 
-    // Yang tidak memegang poker diurutkan berdasarkan sisa kartu paling sedikit ke terbanyak
-    remainingWithoutPoker.sort((a, b) => a.hand.length - b.hand.length);
+    const totalPlayers = this.state.players.length;
+    const isInstantPokerLoss = Boolean(instantPokerLoserId);
 
-    // Pemegang kartu poker LANGSUNG KALAH dan berperingkat paling buncit (dead last).
-    // Pemegang kartu poker lebih banyak berperingkat lebih buruk (mendekati posisi paling buncit).
-    remainingWithPoker.sort((a, b) => {
-      const pokerA = a.hand.filter(c => c.isPoker || c.rank === 15).length;
-      const pokerB = b.hand.filter(c => c.isPoker || c.rank === 15).length;
-      if (pokerA !== pokerB) {
-        return pokerA - pokerB; // Sedikit kartu poker lebih baik daripada banyak kartu poker
-      }
-      return a.hand.length - b.hand.length;
-    });
+    if (isInstantPokerLoss && instantPokerLoserId) {
+      // Saat kalah instan kartu 2: Hanya pemain yang melanggar yang menjadi pecundang kartu poker!
+      // Seluruh pemain lain ("yang lain langsung menang") diurutkan berdasarkan sisa kartu paling sedikit ke terbanyak.
+      const instantLoser = this.getPlayer(instantPokerLoserId);
+      const otherRemaining = remainingPlayers.filter(p => p.id !== instantPokerLoserId);
+      otherRemaining.sort((a, b) => a.hand.length - b.hand.length);
 
-    const finalOrder = [
-      ...finishedPlayers,
-      ...remainingWithoutPoker,
-      ...remainingWithPoker
-    ];
+      finalOrder = [
+        ...finishedPlayers,
+        ...otherRemaining,
+        ...(instantLoser ? [instantLoser] : [])
+      ];
+      pokerLosers = instantLoser ? [instantLoser] : [];
+    } else {
+      // Game over normal: Pemegang kartu poker diurutkan di belakang pemain non-poker
+      const remainingWithoutPoker = remainingPlayers.filter(
+        p => !p.hand.some(c => c.isPoker || c.rank === 15)
+      );
+      const remainingWithPoker = remainingPlayers.filter(
+        p => p.hand.some(c => c.isPoker || c.rank === 15)
+      );
+
+      remainingWithoutPoker.sort((a, b) => a.hand.length - b.hand.length);
+      remainingWithPoker.sort((a, b) => {
+        const pokerA = a.hand.filter(c => c.isPoker || c.rank === 15).length;
+        const pokerB = b.hand.filter(c => c.isPoker || c.rank === 15).length;
+        if (pokerA !== pokerB) {
+          return pokerA - pokerB; // Sedikit kartu poker lebih baik daripada banyak kartu poker
+        }
+        return a.hand.length - b.hand.length;
+      });
+
+      finalOrder = [
+        ...finishedPlayers,
+        ...remainingWithoutPoker,
+        ...remainingWithPoker
+      ];
+      pokerLosers = remainingWithPoker;
+    }
 
     // Berikan peringkat 1..N
     finalOrder.forEach((player, idx) => {
@@ -618,29 +649,33 @@ export class Room {
 
     const winner = this.getPlayer(this.finishers[0] || '');
 
-    // Cek pemain yang kena booing karena masih memegang kartu poker di akhir game
-    const pokerLosers = remainingWithPoker;
+    // Cek pemain yang kena booing karena memegang kartu poker
     this.state.hasPokerBooing = pokerLosers.length > 0;
     this.state.pokerLoserNames = pokerLosers.map(p => p.name);
 
-    const totalPlayers = this.state.players.length;
     const results: GameResult[] = this.state.players.map(p => {
       const rank = p.finishRank || (this.finishers.indexOf(p.id) + 1);
       const pokerCards = p.hand.filter(c => c.isPoker || c.rank === 15);
-      const hasPoker = pokerCards.length > 0;
+      const isThisInstantLoser = isInstantPokerLoss && p.id === instantPokerLoserId;
+      const hasPoker = isInstantPokerLoss ? isThisInstantLoser : pokerCards.length > 0;
 
       let penalty = p.hand.length;
       if (hasPoker) {
         // Double penalty per poker card held
-        penalty = penalty * Math.pow(2, pokerCards.length);
+        penalty = penalty * Math.pow(2, Math.max(1, pokerCards.length));
       }
 
       let scoreDelta = 0;
       if (rank === 1) {
         scoreDelta = 30;
       } else if (rank === 2 && p.hand.length === 0) {
-        // Hanya mendapatkan poin positif jika benar-benar berhasil menghabiskan kartu di tangan
         scoreDelta = totalPlayers >= 4 ? 10 : 0;
+      } else if (hasPoker) {
+        scoreDelta = -penalty;
+      } else if (isInstantPokerLoss) {
+        // Jika game berakhir seketika karena pemain lawan memegang kartu 2 sebagai kartu terakhir,
+        // seluruh pemain lain menang tanpa penalti minus!
+        scoreDelta = rank === 2 && totalPlayers >= 4 ? 10 : 0;
       } else {
         scoreDelta = -penalty;
       }
@@ -657,7 +692,7 @@ export class Room {
         scoreDelta,
         isWinner: rank === 1,
         caughtHoldingPoker: hasPoker,
-        pokerCardsCount: pokerCards.length
+        pokerCardsCount: hasPoker ? Math.max(1, pokerCards.length) : 0
       };
     });
 

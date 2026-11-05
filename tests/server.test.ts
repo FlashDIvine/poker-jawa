@@ -805,6 +805,308 @@ describe('Server & WebSocket Integration', () => {
     expect(cleanResult?.scoreDelta).toBe(-1);
   });
 
+  it('declares a player who finishes with card 2 (poker) as the loser and declares the opponent the winner in a duel', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('POKER_LAST_DUEL', 'Poker Last Duel', mockIo, { fillWithBots: false });
+    room.addPlayer('d1', 'Duelist 1');
+    room.addPlayer('d2', 'Duelist 2');
+    expect(room.startGame()).toBe(true);
+
+    room.state.isFirstTurnOfGame = false;
+    room.state.lastPlay = null;
+    // D1 has only 1 card: 2S (poker)
+    room.state.players[0].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[0].cardCount = 1;
+
+    // D2 has 5 cards
+    room.state.players[1].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '5S', rank: 5, suit: 'S', suitValue: 1, rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '6S', rank: 6, suit: 'S', suitValue: 1, rankLabel: '6', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '7S', rank: 7, suit: 'S', suitValue: 1, rankLabel: '7', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '8S', rank: 8, suit: 'S', suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[1].cardCount = 5;
+
+    room.state.currentTurnPlayerId = 'd1';
+
+    // D1 attempts to finish with 2S!
+    const play = room.playCards('d1', ['2S']);
+    expect(play.success).toBe(true);
+
+    // Game ends immediately! D1 is declared LOSER (Rank 2), D2 is declared WINNER (Rank 1)!
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.winnerId).toBe('d2');
+    expect(room.state.hasPokerBooing).toBe(true);
+    expect(room.state.pokerLoserNames).toEqual(['Duelist 1']);
+
+    const d1Result = room.state.results?.find(r => r.playerId === 'd1');
+    const d2Result = room.state.results?.find(r => r.playerId === 'd2');
+
+    expect(d1Result?.rank).toBe(2);
+    expect(d1Result?.isWinner).toBe(false);
+    expect(d1Result?.caughtHoldingPoker).toBe(true);
+    expect(d1Result?.scoreDelta).toBeLessThan(0);
+
+    expect(d2Result?.rank).toBe(1);
+    expect(d2Result?.isWinner).toBe(true);
+    expect(d2Result?.scoreDelta).toBe(30);
+  });
+
+  it('declares a player who finishes with card 2 (poker) as dead last loser and all other players win in a 4-player game', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('POKER_LAST_4P', 'Poker Last 4P', mockIo, { fillWithBots: false });
+    room.addPlayer('p0', 'Player 0');
+    room.addPlayer('p1', 'Player 1');
+    room.addPlayer('p2', 'Player 2');
+    room.addPlayer('p3', 'Player 3');
+    expect(room.startGame()).toBe(true);
+
+    room.state.isFirstTurnOfGame = false;
+    room.state.lastPlay = null;
+
+    // P0 has 1 card: 2S (poker)
+    room.state.players[0].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[0].cardCount = 1;
+
+    // P1 has 2 cards
+    room.state.players[1].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '5S', rank: 5, suit: 'S', suitValue: 1, rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[1].cardCount = 2;
+
+    // P2 has 3 cards
+    room.state.players[2].hand = [
+      { id: '6S', rank: 6, suit: 'S', suitValue: 1, rankLabel: '6', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '7S', rank: 7, suit: 'S', suitValue: 1, rankLabel: '7', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '8S', rank: 8, suit: 'S', suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[2].cardCount = 3;
+
+    // P3 has 4 cards
+    room.state.players[3].hand = [
+      { id: '9S', rank: 9, suit: 'S', suitValue: 1, rankLabel: '9', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '10S', rank: 10, suit: 'S', suitValue: 1, rankLabel: '10', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: 'JS', rank: 11, suit: 'S', suitValue: 1, rankLabel: 'J', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: 'QS', rank: 12, suit: 'S', suitValue: 1, rankLabel: 'Q', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[3].cardCount = 4;
+
+    room.state.currentTurnPlayerId = 'p0';
+
+    // P0 plays 2S as last card!
+    const play = room.playCards('p0', ['2S']);
+    expect(play.success).toBe(true);
+
+    // P0 is dead last (Rank 4), P1 is Winner (Rank 1), P2 is Rank 2, P3 is Rank 3!
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.hasPokerBooing).toBe(true);
+    expect(room.state.pokerLoserNames).toEqual(['Player 0']);
+
+    const r0 = room.state.results?.find(r => r.playerId === 'p0');
+    const r1 = room.state.results?.find(r => r.playerId === 'p1');
+    const r2 = room.state.results?.find(r => r.playerId === 'p2');
+    const r3 = room.state.results?.find(r => r.playerId === 'p3');
+
+    expect(r0?.rank).toBe(4);
+    expect(r0?.isWinner).toBe(false);
+    expect(r0?.caughtHoldingPoker).toBe(true);
+
+    expect(r1?.rank).toBe(1);
+    expect(r1?.isWinner).toBe(true);
+    expect(r1?.scoreDelta).toBe(30);
+
+    expect(r2?.rank).toBe(2);
+    expect(r2?.scoreDelta).toBe(10); // Rank 2 with 4 players gets +10 points
+
+    expect(r3?.rank).toBe(3);
+    expect(r3?.scoreDelta).toBe(0); // Winners do not get negative penalty on instant poker loss
+  });
+
+  it('declares a player who plays a non-poker card leaving ONLY card 2 in hand as the instant loser', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('POKER_REMAINING_DUEL', 'Poker Remaining Duel', mockIo, { fillWithBots: false });
+    room.addPlayer('d1', 'Duelist 1');
+    room.addPlayer('d2', 'Duelist 2');
+    expect(room.startGame()).toBe(true);
+
+    room.state.isFirstTurnOfGame = false;
+    room.state.lastPlay = null;
+
+    // D1 has 2 cards: 4S and 2S
+    room.state.players[0].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[0].cardCount = 2;
+
+    // D2 has 3 cards
+    room.state.players[1].hand = [
+      { id: '5S', rank: 5, suit: 'S', suitValue: 1, rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '6S', rank: 6, suit: 'S', suitValue: 1, rankLabel: '6', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '7S', rank: 7, suit: 'S', suitValue: 1, rankLabel: '7', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[1].cardCount = 3;
+
+    room.state.currentTurnPlayerId = 'd1';
+
+    // D1 plays 4S -> D1's remaining hand is now [2S]!
+    const play1 = room.playCards('d1', ['4S']);
+    expect(play1.success).toBe(true);
+
+    // D2 passes
+    const pass = room.passTurn('d2');
+    expect(pass.success).toBe(true);
+
+    // D1 plays their last card 2S!
+    const play2 = room.playCards('d1', ['2S']);
+    expect(play2.success).toBe(true);
+
+    // D1 is immediately declared loser because D1 finished with card 2 (poker)!
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.winnerId).toBe('d2');
+    expect(room.state.hasPokerBooing).toBe(true);
+    expect(room.state.pokerLoserNames).toEqual(['Duelist 1']);
+
+    const d1Result = room.state.results?.find(r => r.playerId === 'd1');
+    const d2Result = room.state.results?.find(r => r.playerId === 'd2');
+
+    expect(d1Result?.rank).toBe(2);
+    expect(d1Result?.isWinner).toBe(false);
+    expect(d1Result?.caughtHoldingPoker).toBe(true);
+
+    expect(d2Result?.rank).toBe(1);
+    expect(d2Result?.isWinner).toBe(true);
+    expect(d2Result?.scoreDelta).toBe(30);
+  });
+
+  it('does NOT penalize or boo other players who hold poker cards when another player triggers instant poker loss', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('POKER_FAIR_4P', 'Poker Fair 4P', mockIo, { fillWithBots: false });
+    room.addPlayer('p0', 'Player 0 (Offender)');
+    room.addPlayer('p1', 'Player 1');
+    room.addPlayer('p2', 'Player 2 (Has 2C in 4 cards)');
+    room.addPlayer('p3', 'Player 3');
+    expect(room.startGame()).toBe(true);
+
+    room.state.isFirstTurnOfGame = false;
+    room.state.lastPlay = null;
+
+    // P0 has 1 card: 2S (poker)
+    room.state.players[0].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+
+    // P1 has 2 cards (non-poker)
+    room.state.players[1].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '5S', rank: 5, suit: 'S', suitValue: 1, rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+
+    // P2 has 4 cards, one of which is 2C (not last card, just playing normally)
+    room.state.players[2].hand = [
+      { id: '6S', rank: 6, suit: 'S', suitValue: 1, rankLabel: '6', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '7S', rank: 7, suit: 'S', suitValue: 1, rankLabel: '7', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '8S', rank: 8, suit: 'S', suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '2C', rank: 15, suit: 'C', suitValue: 2, rankLabel: '2', suitSymbol: '♣', suitName: 'Keriting', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+
+    // P3 has 5 cards (non-poker)
+    room.state.players[3].hand = [
+      { id: '9S', rank: 9, suit: 'S', suitValue: 1, rankLabel: '9', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '10S', rank: 10, suit: 'S', suitValue: 1, rankLabel: '10', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: 'JS', rank: 11, suit: 'S', suitValue: 1, rankLabel: 'J', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: 'QS', rank: 12, suit: 'S', suitValue: 1, rankLabel: 'Q', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: 'KS', rank: 13, suit: 'S', suitValue: 1, rankLabel: 'K', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+
+    room.state.currentTurnPlayerId = 'p0';
+    room.playCards('p0', ['2S']);
+
+    expect(room.state.status).toBe('game_over');
+    // ONLY P0 is booed!
+    expect(room.state.pokerLoserNames).toEqual(['Player 0 (Offender)']);
+
+    const r0 = room.state.results?.find(r => r.playerId === 'p0');
+    const r1 = room.state.results?.find(r => r.playerId === 'p1');
+    const r2 = room.state.results?.find(r => r.playerId === 'p2');
+    const r3 = room.state.results?.find(r => r.playerId === 'p3');
+
+    // P0: offender, rank 4, caughtHoldingPoker true, penalty negative
+    expect(r0?.rank).toBe(4);
+    expect(r0?.caughtHoldingPoker).toBe(true);
+    expect(r0?.scoreDelta).toBeLessThan(0);
+
+    // P1: Rank 1 (2 cards) -> +30
+    expect(r1?.rank).toBe(1);
+    expect(r1?.scoreDelta).toBe(30);
+
+    // P2: Rank 2 (4 cards) -> +10, NOT caughtHoldingPoker, NOT penalized!
+    expect(r2?.rank).toBe(2);
+    expect(r2?.caughtHoldingPoker).toBe(false);
+    expect(r2?.scoreDelta).toBe(10);
+
+    // P3: Rank 3 (5 cards) -> 0 pts, NOT penalized!
+    expect(r3?.rank).toBe(3);
+    expect(r3?.caughtHoldingPoker).toBe(false);
+    expect(r3?.scoreDelta).toBe(0);
+  });
+
+  it('allows finishing with card 2 when holdingPokerAsLastCardLoses is explicitly disabled', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('POKER_ALLOWED', 'Poker Allowed Room', mockIo, {
+      fillWithBots: false,
+      rules: { ...DEFAULT_RULES, holdingPokerAsLastCardLoses: false }
+    });
+    room.addPlayer('p0', 'Player 0');
+    room.addPlayer('p1', 'Player 1');
+    expect(room.startGame()).toBe(true);
+
+    room.state.isFirstTurnOfGame = false;
+    room.state.lastPlay = null;
+
+    room.state.players[0].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[1].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+
+    room.state.currentTurnPlayerId = 'p0';
+    const play = room.playCards('p0', ['2S']);
+    expect(play.success).toBe(true);
+
+    // P0 successfully finishes as Rank 1 Winner!
+    expect(room.state.players[0].finishRank).toBe(1);
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.winnerId).toBe('p0');
+  });
+
   it('guarantees 3♠ holder starts and all 3s are discarded even when client passes { rules: DEFAULT_RULES }', () => {
     const mockIo = {
       to: () => ({ emit: () => {} }),
