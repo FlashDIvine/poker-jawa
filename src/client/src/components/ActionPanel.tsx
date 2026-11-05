@@ -349,7 +349,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             onResumeControl();
           }
         }}
-        className="relative w-full overflow-x-auto pt-6 sm:pt-7 pb-1.5 px-2 flex justify-start sm:justify-center items-end min-h-[76px] sm:min-h-[105px] scrollbar-thin shrink-0 z-10 isolate"
+        className="relative w-full overflow-x-auto pt-6 sm:pt-7 landscape:pt-4 pb-1.5 landscape:pb-0.5 px-2 flex justify-start sm:justify-center items-end min-h-[76px] sm:min-h-[105px] landscape:min-h-[64px] landscape:sm:min-h-[68px] scrollbar-thin shrink-0 z-10 isolate"
       >
         <div className={`flex items-end px-2 sm:px-4 ${
           hand.length > 14

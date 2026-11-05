@@ -199,9 +199,9 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   };
 
   return (
-    <div className="w-full min-h-screen landscape:min-h-screen landscape:h-screen flex flex-col justify-between bg-slate-950 text-slate-100 select-none pb-0.5 sm:pb-4 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
+    <div className="w-full min-h-screen landscape:min-h-screen landscape:h-[100dvh] landscape:h-screen flex flex-col justify-between bg-slate-950 text-slate-100 select-none pb-0.5 sm:pb-4 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
       {/* Top Navigation Bar */}
-      <header className="w-full max-w-6xl mx-auto px-1.5 sm:px-4 py-1 sm:py-2.5 landscape:py-0.5 pt-[max(0.375rem,env(safe-area-inset-top,0px))] flex items-center justify-between shrink-0 z-20 border-b border-slate-800/60">
+      <header className="sticky top-0 w-full max-w-6xl mx-auto px-1.5 sm:px-4 py-1 sm:py-2.5 landscape:py-0.5 pt-[max(0.375rem,env(safe-area-inset-top,0px))] flex items-center justify-between shrink-0 z-20 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur-sm">
         {/* Room Info & Code Badge */}
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <button
@@ -358,7 +358,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
         )}
 
         {/* Middle Row: Left Seats Exterior, Shrunk Center Felt Table, Right Seats Exterior */}
-        <div className="w-full flex items-center justify-between gap-1 sm:gap-2 my-auto z-10 px-1 sm:px-2 min-h-0">
+        <div className="w-full flex items-center justify-between gap-1 sm:gap-2 my-auto landscape:my-0 z-10 px-1 sm:px-2 min-h-0">
           {/* Left Seats Exterior (Opponents) */}
           {leftOpponents.length > 0 ? (
             <div className={`flex flex-col items-center justify-center gap-1 sm:gap-2 shrink-0 ${isCompact ? 'w-11 xs:w-13 sm:w-20' : 'w-12 xs:w-14 sm:w-24'}`}>
@@ -390,7 +390,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
             }}
             className="relative flex-1 min-w-0 max-w-full sm:max-w-2xl md:max-w-3xl mx-auto rounded-[16px] sm:rounded-[36px] md:rounded-[48px] felt-border felt-border-mobile-landscape p-0.5 sm:p-1.5 md:p-2.5 shadow-xl"
           >
-            <div className="relative w-full rounded-[14px] sm:rounded-[28px] md:rounded-[40px] felt-table felt-table-mobile-landscape min-h-[85px] xs:min-h-[95px] sm:min-h-[190px] md:min-h-[250px] max-h-[175px] xs:max-h-[195px] sm:max-h-[320px] landscape:min-h-[75px] landscape:max-h-[135px] flex flex-col justify-center items-center p-1 xs:p-1.5 sm:p-4 overflow-hidden border border-emerald-400/20">
+            <div className="relative w-full rounded-[14px] sm:rounded-[28px] md:rounded-[40px] felt-table felt-table-mobile-landscape min-h-[85px] xs:min-h-[95px] sm:min-h-[190px] md:min-h-[250px] max-h-[175px] xs:max-h-[195px] sm:max-h-[320px] landscape:min-h-[85px] landscape:max-h-[160px] flex flex-col justify-center items-center p-1 xs:p-1.5 sm:p-4 landscape:p-1.5 landscape:sm:p-2 overflow-visible border border-emerald-400/20">
               {gameState.status === 'waiting' ? (
                 <div className="flex flex-col items-center justify-center p-3 sm:p-5 rounded-2xl bg-slate-950/60 border border-amber-500/30 text-center max-w-md backdrop-blur-md">
                   <span className="text-xl sm:text-2xl mb-0.5 text-amber-400">♠ ♣ ♦ ♥</span>

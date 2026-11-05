@@ -94,7 +94,7 @@ export const CenterTable: React.FC<CenterTableProps> = ({
   return (
     <div
       key={`trick_${timestamp}`}
-      className={`relative flex flex-col items-center justify-center p-1 sm:p-2.5 rounded-xl sm:rounded-2xl min-h-[80px] sm:min-h-[140px] transition-all ${
+      className={`relative flex flex-col items-center justify-center p-1 sm:p-2.5 landscape:p-0.5 rounded-xl sm:rounded-2xl min-h-[80px] sm:min-h-[140px] landscape:min-h-0 transition-all ${
         isHeavyPlay ? 'animate-rumble' : ''
       }`}
     >
@@ -105,7 +105,7 @@ export const CenterTable: React.FC<CenterTableProps> = ({
       />
 
       {/* Played By & Combo Title */}
-      <div className="flex items-center gap-1 sm:gap-2 mb-0.5 sm:mb-1 z-10 max-w-full px-1">
+      <div className="flex items-center gap-1 sm:gap-2 mb-0.5 sm:mb-1 landscape:mb-0.5 z-10 max-w-full px-1">
         <span className="text-[10px] sm:text-xs text-slate-200 truncate max-w-full drop-shadow-sm">
           <strong className="text-amber-300 font-semibold">{playerName}</strong> mengeluarkan:
         </span>
@@ -114,7 +114,7 @@ export const CenterTable: React.FC<CenterTableProps> = ({
       {/* Cards in Center with Directional Placement Animation (Naruh Kartu Sampe Ke Meja) */}
       <div
         key={`cards_container_${timestamp}`}
-        className="flex items-center justify-center -space-x-5 xs:-space-x-4 sm:-space-x-6 my-0.5 sm:my-1 transition-all z-10 max-w-full px-1 overflow-hidden"
+        className="flex items-center justify-center -space-x-5 xs:-space-x-4 sm:-space-x-6 my-0.5 sm:my-1 landscape:my-0 transition-all z-10 max-w-full px-1 overflow-visible py-0.5"
       >
         {combo.cards.map((card, idx) => {
           const rot = tiltAngles[idx % tiltAngles.length];
@@ -138,7 +138,7 @@ export const CenterTable: React.FC<CenterTableProps> = ({
       </div>
 
       {/* Combination Badge & Special Tag */}
-      <div className="mt-1 sm:mt-2 flex items-center gap-1.5 z-10 animate-badge-pop max-w-full px-1">
+      <div className="mt-1 sm:mt-2 landscape:mt-0.5 flex items-center gap-1.5 z-10 animate-badge-pop max-w-full px-1">
         <div
           className={`px-2.5 sm:px-3.5 py-0.5 rounded-full text-[10px] sm:text-xs font-extrabold shadow-lg border flex items-center gap-1.5 truncate max-w-full ${
             isBong

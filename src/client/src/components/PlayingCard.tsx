@@ -23,7 +23,7 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
 }) => {
   const sizeClasses = {
     sm: 'w-7 h-10 sm:w-10 sm:h-14 text-[9px] sm:text-xs rounded-md',
-    md: 'w-10 h-[56px] sm:w-16 sm:h-24 text-[11px] sm:text-base rounded-lg landscape:w-9 landscape:h-[50px] landscape:sm:w-15 landscape:sm:h-22 landscape:text-[10px]',
+    md: 'w-10 h-[56px] sm:w-16 sm:h-24 text-[11px] sm:text-base rounded-lg landscape:w-9.5 landscape:h-[52px] landscape:sm:w-10 landscape:sm:h-[54px] lg:landscape:w-15 lg:landscape:h-22 landscape:text-[10px] lg:landscape:text-base',
     lg: 'w-14 h-20 sm:w-20 sm:h-28 text-sm sm:text-lg rounded-xl'
   };
 
@@ -60,9 +60,9 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
       } ${disabled ? 'opacity-75 cursor-not-allowed' : ''} ${className}`}
     >
       {/* Top Left Rank & Suit */}
-      <div className={`absolute top-0.5 left-1 sm:top-1 sm:left-1.5 flex flex-col items-center leading-none font-bold ${textColor}`}>
+      <div className={`absolute top-0.5 left-1 sm:top-1 sm:left-1.5 landscape:top-0.5 landscape:left-0.5 flex flex-col items-center leading-none font-bold ${textColor}`}>
         <span className="tracking-tighter">{card.rankLabel}</span>
-        <span className="text-[10px] sm:text-xs -mt-0.5">{card.suitSymbol}</span>
+        <span className="text-[10px] sm:text-xs landscape:text-[9px] -mt-0.5">{card.suitSymbol}</span>
       </div>
 
       {/* Special Badges (Poker 2, Ace As, 3 Waru) */}
@@ -87,15 +87,15 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
 
       {/* Center Large Suit Symbol */}
       <div className={`absolute inset-0 flex items-center justify-center font-serif-poker opacity-85 pointer-events-none ${textColor}`}>
-        <span className={`${size === 'sm' ? 'text-sm' : size === 'md' ? 'text-xl sm:text-3xl' : 'text-3xl sm:text-4xl'}`}>
+        <span className={`${size === 'sm' ? 'text-sm' : size === 'md' ? 'text-xl sm:text-3xl landscape:text-lg lg:landscape:text-3xl' : 'text-3xl sm:text-4xl'}`}>
           {card.suitSymbol}
         </span>
       </div>
 
       {/* Bottom Right Inverted Rank & Suit */}
-      <div className={`absolute bottom-0.5 right-1 sm:bottom-1 sm:right-1.5 flex flex-col items-center leading-none font-bold rotate-180 ${textColor}`}>
+      <div className={`absolute bottom-0.5 right-1 sm:bottom-1 sm:right-1.5 landscape:bottom-0.5 landscape:right-0.5 flex flex-col items-center leading-none font-bold rotate-180 ${textColor}`}>
         <span className="tracking-tighter">{card.rankLabel}</span>
-        <span className="text-[10px] sm:text-xs -mt-0.5">{card.suitSymbol}</span>
+        <span className="text-[10px] sm:text-xs landscape:text-[9px] -mt-0.5">{card.suitSymbol}</span>
       </div>
     </div>
   );

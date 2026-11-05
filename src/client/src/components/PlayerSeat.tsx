@@ -53,7 +53,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
         )}
 
         <div
-          className={`relative rounded-full flex items-center justify-center shadow-lg border-2 ${
+          className={`relative rounded-full flex items-center justify-center shadow-lg border-2 compact-landscape-avatar ${
             compact || isSide
               ? 'w-8 h-8 xs:w-9 xs:h-9 sm:w-13 sm:h-13 text-base xs:text-lg sm:text-2xl landscape:w-8 landscape:h-8 landscape:sm:w-11 landscape:sm:h-11'
               : 'w-8 h-8 xs:w-9 xs:h-9 sm:w-16 sm:h-16 text-base xs:text-lg sm:text-3xl landscape:w-8 landscape:h-8 landscape:sm:w-13 landscape:sm:h-13'
@@ -151,7 +151,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
       {/* Opponent Card Stack Fan (for non-self seats) */}
       {!isSelf && player.cardCount > 0 && (
-        <div className={`hidden sm:flex items-center justify-center -space-x-8 mt-1 pointer-events-none scale-75 sm:scale-90 transition-all ${isDealing ? 'animate-deal-hand' : ''}`}>
+        <div className={`hidden sm:flex compact-landscape-hide items-center justify-center -space-x-8 mt-1 pointer-events-none scale-75 sm:scale-90 transition-all ${isDealing ? 'animate-deal-hand' : ''}`}>
           {Array.from({ length: Math.min(5, player.cardCount) }).map((_, i) => (
             <PlayingCard
               key={i}
