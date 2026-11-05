@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { findAllPossibleCombos, decideBotMove } from '../src/shared/bot.js';
-import { Card, POKER_JAWA_RULES } from '../src/shared/types.js';
+import { Card, POKER_JAWA_RULES, DEFAULT_RULES } from '../src/shared/types.js';
 import { evaluateCombo } from '../src/shared/engine.js';
 
 function makeCard(rank: number, suit: 'S' | 'C' | 'D' | 'H'): Card {
@@ -58,7 +58,7 @@ describe('Bot logic', () => {
     expect(combos.some(c => c.type === 'FULL_HOUSE' && c.mainRank === 5)).toBe(true);
   });
 
-  it('guarantees opening play includes 3 Waru (3♠)', () => {
+  it('guarantees opening play includes 3 Waru (3♠) when discardThrees is false', () => {
     const hand = [
       makeCard(3, 'S'),
       makeCard(3, 'C'),
@@ -66,12 +66,12 @@ describe('Bot logic', () => {
       makeCard(15, 'H')
     ];
 
-    const move = decideBotMove(hand, null, true);
+    const move = decideBotMove(hand, null, true, { ...DEFAULT_RULES, discardThrees: false });
     expect(move).not.toBeNull();
     expect(move?.some(c => c.isThreeSpades)).toBe(true);
   });
 
-  it('guarantees opening play discards rank 3 when holding other rank 3 cards without 3♠', () => {
+  it('guarantees opening play discards rank 3 when holding other rank 3 cards without 3♠ and discardThrees is false', () => {
     const hand = [
       makeCard(3, 'D'),
       makeCard(3, 'H'),
@@ -79,9 +79,25 @@ describe('Bot logic', () => {
       makeCard(15, 'H')
     ];
 
-    const move = decideBotMove(hand, null, true);
+    const move = decideBotMove(hand, null, true, { ...DEFAULT_RULES, discardThrees: false });
     expect(move).not.toBeNull();
     expect(move?.some(c => c.rank === 3)).toBe(true);
+  });
+
+  it('opening play when discardThrees is true (default) allows bot to lead with lowest legal combo from remaining cards', () => {
+    // Under default Indonesian Remi rules, all 3s are discarded prior to play.
+    const hand = [
+      makeCard(4, 'S'),
+      makeCard(4, 'C'),
+      makeCard(7, 'H'),
+      makeCard(15, 'H')
+    ];
+
+    const move = decideBotMove(hand, null, true);
+    expect(move).not.toBeNull();
+    // Bot leads with its lowest combination (pair of 4s)
+    expect(move).toHaveLength(2);
+    expect(move?.every(c => c.rank === 4)).toBe(true);
   });
 
   it('counters Ace with Full House or Tris or Poker 2', () => {
@@ -147,16 +163,16 @@ describe('Bot logic', () => {
     expect(evaluated?.type).toBe('TRIS');
   });
 
-  it('prefers leading Tris of 3s over Pair on first turn', () => {
+  it('prefers leading Tris of 3s over Pair on first turn when discardThrees is false', () => {
     const hand = [
       makeCard(3, 'S'), makeCard(3, 'C'), makeCard(3, 'D'),
       makeCard(8, 'H'), makeCard(9, 'H')
     ];
 
-    const move = decideBotMove(hand, null, true);
+    const move = decideBotMove(hand, null, true, { ...DEFAULT_RULES, discardThrees: false });
     expect(move).not.toBeNull();
     expect(move).toHaveLength(3);
-    const evaluated = evaluateCombo(move!);
+    const evaluated = evaluateCombo(move!, { ...DEFAULT_RULES, discardThrees: false });
     expect(evaluated?.type).toBe('TRIS');
   });
 

@@ -66,7 +66,9 @@ export interface GameRules {
   cutAceWithTrisOrFH: boolean;          // Patah As dengan Tris atau Full House (aturan default Remi)
   cutTwoWithTrisOrFH: boolean;          // Patah 2 dengan Tris atau Full House (aturan default Remi)
   openingCard: '3S' | '3D' | 'any_3';   // Kartu pembuka: 3 Waru (3♠) / 3 Wajik (3♦) / bebas angka 3
-  deckCount: 'auto' | 1 | 2;            // 1 dek, 2 dek, atau auto (1 dek <=5 pemain, 2 dek 6-10 pemain)
+  deckCount: 1;                         // Strictly 1 dek (52 kartu) selalu
+  discardThrees?: boolean;              // Di awal game semua angka 3 dibuang dan pemegang 3 Waru (3♠) jalan duluan
+  allowHints?: boolean;                 // Izinkan tombol saran kombinasi (Hint)
 }
 
 export const DEFAULT_RULES: GameRules = {
@@ -89,7 +91,9 @@ export const DEFAULT_RULES: GameRules = {
   cutAceWithTrisOrFH: true,
   cutTwoWithTrisOrFH: true,
   openingCard: '3S',
-  deckCount: 'auto'
+  deckCount: 1,
+  discardThrees: true,
+  allowHints: true
 };
 
 export const POKER_JAWA_RULES: GameRules = {
@@ -112,7 +116,9 @@ export const POKER_JAWA_RULES: GameRules = {
   cutAceWithTrisOrFH: false,
   cutTwoWithTrisOrFH: false,
   openingCard: '3D',
-  deckCount: 'auto'
+  deckCount: 1,
+  discardThrees: false,
+  allowHints: true
 };
 
 export interface PlayedTrick {
@@ -136,6 +142,7 @@ export interface Player {
   seatIndex: number; // 0, 1, 2, 3
   score: number;
   finishRank?: number | null; // 1 (Juara 1), 2 (Juara 2), dst
+  isAutoPlay?: boolean; // True jika giliran diambil alih oleh bot karena AFK / tidak menyentuh kartu
 }
 
 export type GameStatus = 'waiting' | 'dealing' | 'playing' | 'round_over' | 'game_over';
@@ -149,6 +156,8 @@ export interface GameResult {
   remainingCards: number;
   scoreDelta: number;
   isWinner: boolean;
+  caughtHoldingPoker?: boolean; // True jika masih memegang kartu poker (angka 2) di akhir game
+  pokerCardsCount?: number;     // Jumlah kartu poker yang masih dipegang
 }
 
 export interface GameState {
@@ -171,6 +180,8 @@ export interface GameState {
   winnerId: string | null;
   finishers?: string[]; // Urutan ID pemain yang sudah habis kartunya (Juara 1, 2, dst)
   results: GameResult[] | null;
+  hasPokerBooing?: boolean;     // True jika ada pemain yang disoraki huuu karena memegang kartu poker di akhir game
+  pokerLoserNames?: string[];   // Nama pemain-pemain yang disoraki huuu
 }
 
 export interface ChatMessage {

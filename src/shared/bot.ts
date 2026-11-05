@@ -281,8 +281,8 @@ export function decideBotMove(
 ): Card[] | null {
   const allCombos = findAllPossibleCombos(hand, rules);
 
-  // Case 1: First turn of the entire game (MUST contain rank 3 / opening card)
-  if (isFirstTurnOfGame) {
+  // Case 1: First turn of the entire game (MUST contain rank 3 if 3s were not discarded)
+  if (isFirstTurnOfGame && !rules.discardThrees) {
     let validFirstPlays = allCombos.filter(combo =>
       combo.cards.some(c => c.rank === 3)
     );

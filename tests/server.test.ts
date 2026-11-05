@@ -4,6 +4,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { io as ClientSocket, Socket as ClientSocketType } from 'socket.io-client';
 import { Room, RoomManager } from '../src/server/roomManager.js';
+import { DEFAULT_RULES } from '../src/shared/types.js';
 
 describe('Server & WebSocket Integration', () => {
   let server: http.Server;
@@ -79,6 +80,33 @@ describe('Server & WebSocket Integration', () => {
         if (room) {
           room.startGame();
         }
+      });
+
+      socket.on('resume_control', (payload) => {
+        const { roomId, playerId } = payload || {};
+        const code = (roomId || currentRoomId || '').toUpperCase();
+        const room = roomManager.getRoom(code);
+        if (!room) return;
+
+        const pid = playerId || currentPlayerId;
+        if (!pid) return;
+
+        const resumed = room.resumeControl(pid);
+        if (resumed) {
+          socket.emit('control_resumed', { playerId: pid });
+        }
+      });
+
+      socket.on('send_chat', ({ roomId, playerId, text }) => {
+        const code = (roomId || currentRoomId || '').toUpperCase();
+        const room = roomManager.getRoom(code);
+        if (!room) return;
+
+        const pid = playerId || currentPlayerId;
+        if (!pid || !text) return;
+
+        room.resumeControl(pid);
+        room.addChatMessage(pid, text);
       });
     });
 
@@ -157,10 +185,12 @@ describe('Server & WebSocket Integration', () => {
     expect(playingState.status).toBe('playing');
     expect(playingState.players).toHaveLength(4);
 
-    // 1 human player + 3 bots
+    // 1 human player + 3 bots (52 cards dealt minus 4 rank 3 cards discarded = 48 cards total)
     const myPlayer = playingState.players.find((p: any) => p.id === 'test_player_1');
     expect(myPlayer).toBeDefined();
-    expect(myPlayer.hand).toHaveLength(13);
+    expect(myPlayer.hand.some((c: any) => c.rank === 3)).toBe(false);
+    const totalCards = playingState.players.reduce((sum: number, p: any) => sum + p.cardCount, 0);
+    expect(totalCards).toBe(48);
 
     const botPlayers = playingState.players.filter((p: any) => p.isBot);
     expect(botPlayers).toHaveLength(3);
@@ -369,10 +399,10 @@ describe('Server & WebSocket Integration', () => {
     room.addPlayer('d2', 'Duelist 2');
     expect(room.startGame()).toBe(true);
 
-    // Both players receive 26 cards each
+    // 52 cards divided between 2 players (26 each), minus all four 3s discarded (total 48 cards)
     expect(room.state.players).toHaveLength(2);
-    expect(room.state.players[0].hand).toHaveLength(26);
-    expect(room.state.players[1].hand).toHaveLength(26);
+    expect(room.state.players[0].hand.length + room.state.players[1].hand.length).toBe(48);
+    expect(room.state.players.every(p => !p.hand.some(c => c.rank === 3))).toBe(true);
 
     // Determine starter (the one holding 3S)
     const starterId = room.state.currentTurnPlayerId!;
@@ -424,23 +454,719 @@ describe('Server & WebSocket Integration', () => {
     expect(room.state.results?.[1].isWinner).toBe(false);
   });
 
-  it('normalizes string deckCount and deals 2 decks (104 cards) for 4 players when deckCount is "2"', () => {
+  it('strictly deals 1 deck (52 cards max) even if deckCount was set to 2 or for 6-10 players', () => {
     const mockIo = {
       to: () => ({ emit: () => {} }),
       sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
     } as any;
 
-    const room = new Room('2DECK', '2 Deck Room', mockIo, {
+    const room = new Room('1DECK_LIMIT', 'Strict 1 Deck Room', mockIo, {
       fillWithBots: true,
       maxPlayers: 4,
       rules: { deckCount: '2' as any }
     });
 
-    expect(room.rules.deckCount).toBe(2);
+    expect(room.rules.deckCount).toBe(1);
     expect(room.startGame()).toBe(true);
     expect(room.state.players).toHaveLength(4);
-    // 104 cards divided by 4 players = 26 cards each
-    expect(room.state.players[0].hand).toHaveLength(26);
-    expect(room.state.players[1].hand).toHaveLength(26);
+    // 52 cards divided by 4 players = 13 cards each initially, minus all four rank 3 cards discarded
+    const totalRemaining = room.state.players.reduce((sum, p) => sum + p.hand.length, 0);
+    expect(totalRemaining).toBe(48); // 52 - 4 (all 3s discarded)
+    expect(room.state.players.every(p => !p.hand.some(c => c.rank === 3))).toBe(true);
+  });
+
+  it('opening discard of all 3s and 3♠ holder gets first turn without needing to hold a 3', () => {
+    const chatMessages: string[] = [];
+    const mockIo = {
+      to: () => ({
+        emit: (event: string, data: any) => {
+          if (event === 'chat_message' && data.isSystem) {
+            chatMessages.push(data.text);
+          }
+        }
+      }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('OPEN_3', 'Opening 3s Room', mockIo, { fillWithBots: false });
+    room.addPlayer('p0', 'Player 0');
+    room.addPlayer('p1', 'Player 1');
+    room.addPlayer('p2', 'Player 2');
+    room.addPlayer('p3', 'Player 3');
+
+    expect(room.startGame()).toBe(true);
+
+    // Verify nobody holds any 3
+    for (const player of room.state.players) {
+      expect(player.hand.some(c => c.rank === 3)).toBe(false);
+      expect(player.cardCount).toBe(player.hand.length);
+    }
+
+    const starterId = room.state.currentTurnPlayerId!;
+    expect(starterId).toBeDefined();
+    const starter = room.getPlayer(starterId)!;
+    expect(starter).toBeDefined();
+
+    // The starter player can play their first legal combo without a 3 (e.g. single 4 or lowest card)
+    const lowestCard = [...starter.hand].sort((a, b) => a.rank - b.rank)[0];
+    const playResult = room.playCards(starterId, [lowestCard.id]);
+    expect(playResult.success).toBe(true);
+
+    // Verify chat cleanup: "mengeluarkan", "memilih Lewat", and "Semua pemain lain lewat" are NOT in system chat!
+    expect(chatMessages.some(m => m.includes('mengeluarkan:'))).toBe(false);
+    expect(chatMessages.some(m => m.includes('memilih Lewat'))).toBe(false);
+    expect(chatMessages.some(m => m.includes('Semua pemain lain lewat'))).toBe(false);
+  });
+
+  it('ranks dead last and flags booing when a player holds a poker card (rank 2) at game end', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('BOO1', 'Booing Test Room', mockIo, { fillWithBots: false, turnTimerSeconds: 15 });
+    room.addPlayer('p0', 'Winner P0');
+    room.addPlayer('p1', 'Player 1');
+    room.addPlayer('p2', 'Poker Holder P2');
+    expect(room.startGame()).toBe(true);
+
+    // P0: 1 card (3S)
+    // P1: 3 cards (4S, 5S, 6S - no poker)
+    // P2: 1 card (2S - poker card!)
+    room.state.isFirstTurnOfGame = true;
+    room.state.players[0].hand = [
+      { id: '3S', rank: 3, suit: 'S', suitValue: 1, rankLabel: '3', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: true }
+    ];
+    room.state.players[1].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '5S', rank: 5, suit: 'S', suitValue: 1, rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '6S', rank: 6, suit: 'S', suitValue: 1, rankLabel: '6', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[2].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    room.state.currentTurnPlayerId = 'p0';
+    room.state.leadPlayerId = 'p0';
+
+    // P0 plays 3S -> finishes!
+    const play1 = room.playCards('p0', ['3S']);
+    expect(play1.success).toBe(true);
+    expect(room.state.players[0].finishRank).toBe(1);
+
+    // Turn is at P1, P1 plays 4S -> now P1 has 2 cards
+    const play2 = room.playCards('p1', ['4S']);
+    expect(play2.success).toBe(true);
+
+    // Turn is at P2, P2 plays 2S -> P2 has 0 cards -> finishes 2nd
+    // But let's test when P2 does NOT play 2S and P1 clears, OR game ends:
+    // P2 passes
+    const pass1 = room.passTurn('p2');
+    expect(pass1.success).toBe(true);
+
+    // Turn back to P1, P1 plays 5S
+    const play3 = room.playCards('p1', ['5S']);
+    expect(play3.success).toBe(true);
+
+    // P2 passes
+    const pass2 = room.passTurn('p2');
+    expect(pass2.success).toBe(true);
+
+    // P1 plays last card 6S -> P1 finishes 2nd!
+    const play4 = room.playCards('p1', ['6S']);
+    expect(play4.success).toBe(true);
+    expect(room.state.players[1].finishRank).toBe(2);
+
+    // Game is over!
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.hasPokerBooing).toBe(true);
+    expect(room.state.pokerLoserNames).toEqual(['Poker Holder P2']);
+
+    // P2 held 2S (poker card): must rank dead last (rank 3)!
+    expect(room.state.players[2].finishRank).toBe(3);
+
+    const p2Result = room.state.results?.find(r => r.playerId === 'p2');
+    expect(p2Result).toBeDefined();
+    expect(p2Result?.rank).toBe(3);
+    expect(p2Result?.caughtHoldingPoker).toBe(true);
+    expect(p2Result?.pokerCardsCount).toBe(1);
+    // Double penalty for holding poker: 1 card * 2^1 = 2 -> scoreDelta = -2
+    expect(p2Result?.scoreDelta).toBe(-2);
+  });
+
+  it('ranks poker card holders dead last behind non-poker players even if non-poker players have more cards', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('BOO2', 'Multi Player Booing Room', mockIo, { fillWithBots: false, turnTimerSeconds: 15 });
+    room.addPlayer('p0', 'Player 0');
+    room.addPlayer('p1', 'Player 1');
+    room.addPlayer('p2', 'Player 2');
+    room.addPlayer('p3', 'Player 3');
+    expect(room.startGame()).toBe(true);
+
+    // P0 has finished earlier (0 cards)
+    room.state.players[0].hand = [];
+    room.state.players[0].cardCount = 0;
+    room.state.players[0].finishRank = 1;
+    (room as any).finishers = ['p0'];
+
+    // P1 has 5 cards, none is poker
+    room.state.players[1].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '5S', rank: 5, suit: 'S', suitValue: 1, rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '6S', rank: 6, suit: 'S', suitValue: 1, rankLabel: '6', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '7S', rank: 7, suit: 'S', suitValue: 1, rankLabel: '7', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '8S', rank: 8, suit: 'S', suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    // P2 has 1 card: 2S (poker card)
+    room.state.players[2].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    // P3 has 2 cards: 2H and 2D (two poker cards!)
+    room.state.players[3].hand = [
+      { id: '2H', rank: 15, suit: 'H', suitValue: 4, rankLabel: '2', suitSymbol: '♥', suitName: 'Hati', color: 'red', isPoker: true, isAce: false, isThreeSpades: false },
+      { id: '2D', rank: 15, suit: 'D', suitValue: 3, rankLabel: '2', suitSymbol: '♦', suitName: 'Wajik', color: 'red', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+
+    // Trigger game over directly
+    (room as any).handleGameOver();
+
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.hasPokerBooing).toBe(true);
+    expect(room.state.pokerLoserNames).toEqual(['Player 2', 'Player 3']);
+
+    // P0: Rank 1
+    // P1: Rank 2 (even with 5 cards, because P1 has NO poker cards!)
+    // P2: Rank 3 (dead last group, 1 card)
+    // P3: Rank 4 (dead last group, 2 poker cards)
+    expect(room.state.players[0].finishRank).toBe(1);
+    expect(room.state.players[1].finishRank).toBe(2);
+    expect(room.state.players[2].finishRank).toBe(3);
+    expect(room.state.players[3].finishRank).toBe(4);
+
+    const r1 = room.state.results?.find(r => r.playerId === 'p1');
+    const r2 = room.state.results?.find(r => r.playerId === 'p2');
+    const r3 = room.state.results?.find(r => r.playerId === 'p3');
+
+    expect(r1?.caughtHoldingPoker).toBe(false);
+    expect(r1?.scoreDelta).toBe(-5); // Hand has 5 cards and did not finish -> -5
+    expect(r2?.caughtHoldingPoker).toBe(true);
+    expect(r2?.scoreDelta).toBe(-2);
+    expect(r3?.caughtHoldingPoker).toBe(true);
+    expect(r3?.pokerCardsCount).toBe(2);
+    // P3 penalty: 2 cards * 2^2 = 8 -> scoreDelta = -8
+    expect(r3?.scoreDelta).toBe(-8);
+  });
+
+  it('ranks player with MORE poker cards behind player with FEWER poker cards even if having fewer total cards', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('POKER_COUNT_SORT', 'Poker Count Sort', mockIo, { fillWithBots: false, turnTimerSeconds: 15 });
+    room.addPlayer('p0', 'Winner 0');
+    room.addPlayer('p1', 'Player 1 (1 Poker, 3 total cards)');
+    room.addPlayer('p2', 'Player 2 (2 Pokers, 2 total cards)');
+    expect(room.startGame()).toBe(true);
+
+    // P0: 0 cards (finished)
+    room.state.players[0].hand = [];
+    room.state.players[0].cardCount = 0;
+    room.state.players[0].finishRank = 1;
+    (room as any).finishers = ['p0'];
+
+    // P1: 3 cards, 1 poker card (2S)
+    room.state.players[1].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false },
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+      { id: '5S', rank: 5, suit: 'S', suitValue: 1, rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+
+    // P2: 2 cards, BOTH are poker cards (2H, 2D)
+    room.state.players[2].hand = [
+      { id: '2H', rank: 15, suit: 'H', suitValue: 4, rankLabel: '2', suitSymbol: '♥', suitName: 'Hati', color: 'red', isPoker: true, isAce: false, isThreeSpades: false },
+      { id: '2D', rank: 15, suit: 'D', suitValue: 3, rankLabel: '2', suitSymbol: '♦', suitName: 'Wajik', color: 'red', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+
+    (room as any).handleGameOver();
+
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.hasPokerBooing).toBe(true);
+
+    // P1 held 1 poker card -> Rank 2
+    // P2 held 2 poker cards -> Rank 3 (dead last, because holding more poker cards is more severely penalized!)
+    expect(room.state.players[0].finishRank).toBe(1);
+    expect(room.state.players[1].finishRank).toBe(2);
+    expect(room.state.players[2].finishRank).toBe(3);
+
+    const r1 = room.state.results?.find(r => r.playerId === 'p1');
+    const r2 = room.state.results?.find(r => r.playerId === 'p2');
+    expect(r1?.rank).toBe(2);
+    expect(r2?.rank).toBe(3);
+    expect(r1?.scoreDelta).toBe(-6); // 3 cards * 2^1 = 6 -> -6
+    expect(r2?.scoreDelta).toBe(-8); // 2 cards * 2^2 = 8 -> -8
+  });
+
+  it('handles game over when ALL remaining players hold poker cards', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('ALL_BOO', 'All Boo Room', mockIo, { fillWithBots: false });
+    room.addPlayer('p0', 'Winner');
+    room.addPlayer('p1', 'Loser 1');
+    room.addPlayer('p2', 'Loser 2');
+    room.addPlayer('p3', 'Loser 3');
+    expect(room.startGame()).toBe(true);
+
+    room.state.players[0].hand = [];
+    room.state.players[0].finishRank = 1;
+    (room as any).finishers = ['p0'];
+
+    // All three remaining hold poker cards
+    room.state.players[1].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[2].hand = [
+      { id: '2C', rank: 15, suit: 'C', suitValue: 2, rankLabel: '2', suitSymbol: '♣', suitName: 'Keriting', color: 'black', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+    room.state.players[3].hand = [
+      { id: '2H', rank: 15, suit: 'H', suitValue: 4, rankLabel: '2', suitSymbol: '♥', suitName: 'Hati', color: 'red', isPoker: true, isAce: false, isThreeSpades: false }
+    ];
+
+    (room as any).handleGameOver();
+
+    expect(room.state.status).toBe('game_over');
+    expect(room.state.hasPokerBooing).toBe(true);
+    expect(room.state.pokerLoserNames).toEqual(['Loser 1', 'Loser 2', 'Loser 3']);
+    expect(room.state.results?.every(r => r.rank === 1 || r.caughtHoldingPoker)).toBe(true);
+  });
+
+  it('handles 2-player duel when the loser is caught holding a poker card vs no poker card', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    // Sub-case A: Duel loser holds a poker card (2S)
+    const roomA = new Room('DUEL_BOO', 'Duel Booing', mockIo, { fillWithBots: false, turnTimerSeconds: 15 });
+    roomA.addPlayer('d1', 'Duelist 1');
+    roomA.addPlayer('d2', 'Duelist 2');
+    expect(roomA.startGame()).toBe(true);
+
+    roomA.state.isFirstTurnOfGame = true;
+    roomA.state.players[0].hand = [
+      { id: '3S', rank: 3, suit: 'S', suitValue: 1, rankLabel: '3', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: true }
+    ];
+    roomA.state.players[1].hand = [
+      { id: '2S', rank: 15, suit: 'S', suitValue: 1, rankLabel: '2', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: true, isAce: false, isThreeSpades: false },
+      { id: '9S', rank: 9, suit: 'S', suitValue: 1, rankLabel: '9', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    roomA.state.currentTurnPlayerId = 'd1';
+
+    // D1 plays 3S -> finishes! Game ends immediately.
+    const playA = roomA.playCards('d1', ['3S']);
+    expect(playA.success).toBe(true);
+    expect(roomA.state.status).toBe('game_over');
+    expect(roomA.state.hasPokerBooing).toBe(true);
+    expect(roomA.state.pokerLoserNames).toEqual(['Duelist 2']);
+    expect(roomA.state.players[1].finishRank).toBe(2);
+    const d2Result = roomA.state.results?.find(r => r.playerId === 'd2');
+    expect(d2Result?.caughtHoldingPoker).toBe(true);
+    // 2 cards * 2^1 = 4 -> -4
+    expect(d2Result?.scoreDelta).toBe(-4);
+
+    // Sub-case B: Duel loser does NOT hold any poker card
+    const roomB = new Room('DUEL_NO_BOO', 'Duel Clean', mockIo, { fillWithBots: false, turnTimerSeconds: 15 });
+    roomB.addPlayer('d1', 'Duelist 1');
+    roomB.addPlayer('d2', 'Duelist 2');
+    expect(roomB.startGame()).toBe(true);
+
+    roomB.state.isFirstTurnOfGame = true;
+    roomB.state.players[0].hand = [
+      { id: '3S', rank: 3, suit: 'S', suitValue: 1, rankLabel: '3', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: true }
+    ];
+    roomB.state.players[1].hand = [
+      { id: '4S', rank: 4, suit: 'S', suitValue: 1, rankLabel: '4', suitSymbol: '♠', suitName: 'Waru', color: 'black', isPoker: false, isAce: false, isThreeSpades: false }
+    ];
+    roomB.state.currentTurnPlayerId = 'd1';
+
+    const playB = roomB.playCards('d1', ['3S']);
+    expect(playB.success).toBe(true);
+    expect(roomB.state.status).toBe('game_over');
+    expect(roomB.state.hasPokerBooing).toBe(false);
+    expect(roomB.state.pokerLoserNames).toEqual([]);
+    const cleanResult = roomB.state.results?.find(r => r.playerId === 'd2');
+    expect(cleanResult?.caughtHoldingPoker).toBe(false);
+    expect(cleanResult?.scoreDelta).toBe(-1);
+  });
+
+  it('guarantees 3♠ holder starts and all 3s are discarded even when client passes { rules: DEFAULT_RULES }', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('DISCARD_OPTS', 'Options Discard Test', mockIo, {
+      fillWithBots: false,
+      rules: { ...DEFAULT_RULES }
+    });
+
+    room.addPlayer('u1', 'User 1');
+    room.addPlayer('u2', 'User 2');
+    expect(room.rules.discardThrees).toBe(true);
+    expect(room.startGame()).toBe(true);
+
+    // Total 48 cards remaining (52 - 4 = 48)
+    const remaining = room.state.players.reduce((sum, p) => sum + p.cardCount, 0);
+    expect(remaining).toBe(48);
+    expect(room.state.players.every(p => !p.hand.some(c => c.rank === 3))).toBe(true);
+
+    // Starter should be able to lead with any legal combo from remaining hand
+    const starterId = room.state.currentTurnPlayerId!;
+    const starter = room.getPlayer(starterId)!;
+    const playResult = room.playCards(starterId, [starter.hand[0].id]);
+    expect(playResult.success).toBe(true);
+  });
+
+  it('supports no-hint mode option at room creation', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+    } as any;
+
+    const room = new Room('NO_HINT', 'No Hint Room', mockIo, {
+      fillWithBots: false,
+      rules: { ...DEFAULT_RULES, allowHints: false }
+    });
+
+    expect(room.rules.allowHints).toBe(false);
+    expect(room.state.rules.allowHints).toBe(false);
+  });
+
+  describe('AFK Takeover and Resume Control', () => {
+    it('resumeControl() clears isAutoPlay, reconnects player, and cancels botTimeout on current turn', () => {
+      let broadcastCount = 0;
+      let systemMessages: string[] = [];
+      const mockIo = {
+        to: () => ({
+          emit: (_event: string, msg: any) => {
+            if (_event === 'chat_message' && msg?.isSystem) {
+              systemMessages.push(msg.text);
+            }
+          }
+        }),
+        sockets: {
+          adapter: { rooms: new Map([['AFK_ROOM', new Set(['sock_1'])]]) },
+          sockets: new Map([['sock_1', { emit: () => { broadcastCount++; }, playerId: 'p1' }]])
+        }
+      } as any;
+
+      const room = new Room('AFK_ROOM', 'AFK Test Room', mockIo, {
+        fillWithBots: false,
+        turnTimerSeconds: 15
+      });
+
+      const p1 = room.addPlayer('p1', 'Player 1')!;
+      const p2 = room.addPlayer('p2', 'Player 2')!;
+      expect(room.startGame()).toBe(true);
+
+      // Simulate player 1 getting detected as AFK (handleTurnTimeout or manual flag)
+      p1.isAutoPlay = true;
+      p1.connected = false;
+      room.state.currentTurnPlayerId = 'p1';
+
+      // Schedule a simulated botTimeout
+      let botTimerRan = false;
+      (room as any).botTimeout = setTimeout(() => {
+        botTimerRan = true;
+      }, 5000);
+
+      // Room timer was running down
+      room.state.turnTimeRemaining = 3;
+
+      // Player clicks / resumes control
+      const resumed = room.resumeControl('p1');
+      expect(resumed).toBe(true);
+      expect(p1.isAutoPlay).toBe(false);
+      expect(p1.connected).toBe(true);
+      expect((room as any).botTimeout).toBeNull();
+      expect(botTimerRan).toBe(false);
+      expect(room.state.turnTimeRemaining).toBe(15);
+      expect(broadcastCount).toBeGreaterThan(0);
+      expect(systemMessages.some(m => m.includes('Player 1') && m.includes('(ON)'))).toBe(true);
+
+      room.cleanup();
+    });
+
+    it('resumeControl() clears isAutoPlay even when it is NOT the player turn', () => {
+      let broadcastCount = 0;
+      const mockIo = {
+        to: () => ({ emit: () => {} }),
+        sockets: {
+          adapter: { rooms: new Map([['AFK_NOT_TURN', new Set(['sock_2'])]]) },
+          sockets: new Map([['sock_2', { emit: () => { broadcastCount++; }, playerId: 'p2' }]])
+        }
+      } as any;
+
+      const room = new Room('AFK_NOT_TURN', 'AFK Not Turn Room', mockIo, {
+        fillWithBots: false,
+        turnTimerSeconds: 15
+      });
+
+      const p1 = room.addPlayer('p1', 'Player 1')!;
+      const p2 = room.addPlayer('p2', 'Player 2')!;
+      expect(room.startGame()).toBe(true);
+
+      // p2 is marked AFK, but it is p1's turn
+      p2.isAutoPlay = true;
+      room.state.currentTurnPlayerId = 'p1';
+
+      const resumed = room.resumeControl('p2');
+      expect(resumed).toBe(true);
+      expect(p2.isAutoPlay).toBe(false);
+      expect(broadcastCount).toBeGreaterThan(0);
+
+      // Subsequent resumeControl when already false is idempotent
+      const resumedAgain = room.resumeControl('p2');
+      expect(resumedAgain).toBe(false);
+
+      room.cleanup();
+    });
+
+    it('resumeControl() rejects bots and unknown player ids', () => {
+      const mockIo = {
+        to: () => ({ emit: () => {} }),
+        sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+      } as any;
+
+      const room = new Room('AFK_BOT_TEST', 'AFK Bot Test', mockIo, {
+        fillWithBots: true,
+        maxPlayers: 2
+      });
+      room.addPlayer('human1', 'Human 1');
+      room.startGame();
+
+      const bot = room.state.players.find(p => p.isBot)!;
+      bot.isAutoPlay = true;
+      expect(room.resumeControl(bot.id)).toBe(false);
+      expect(room.resumeControl('non_existent')).toBe(false);
+
+      room.cleanup();
+    });
+
+    it('resumes control via Socket.IO resume_control event and receives control_resumed', async () => {
+      const socket = ClientSocket(`http://localhost:${port}`, {
+        transports: ['websocket']
+      });
+
+      await new Promise<void>((resolve) => socket.on('connect', resolve));
+
+      const roomId = 'AFK_SOCK';
+      socket.emit('join_room', {
+        roomId,
+        playerName: 'AfkTester',
+        avatar: '🤠',
+        playerId: 'tester_afk_pid'
+      });
+
+      await new Promise<void>((resolve) => socket.on('joined_room', () => resolve()));
+      socket.emit('start_game', { roomId });
+
+      await new Promise<void>((resolve) => {
+        socket.on('game_state', (s: any) => {
+          if (s.status === 'playing') resolve();
+        });
+      });
+
+      const room = roomManager.getRoom(roomId)!;
+      const tester = room.getPlayer('tester_afk_pid')!;
+      // Mark as AFK
+      tester.isAutoPlay = true;
+      room.broadcastState();
+
+      // Wait for state reflecting AFK
+      await new Promise<void>((resolve) => {
+        const handler = (s: any) => {
+          const self = s.players.find((p: any) => p.id === 'tester_afk_pid');
+          if (self?.isAutoPlay) {
+            socket.off('game_state', handler);
+            resolve();
+          }
+        };
+        socket.on('game_state', handler);
+      });
+
+      // Now emit resume_control over socket
+      const controlResumedPromise = new Promise<void>((resolve) => {
+        socket.on('control_resumed', () => resolve());
+      });
+
+      const stateUpdatedPromise = new Promise<void>((resolve) => {
+        const handler = (s: any) => {
+          const self = s.players.find((p: any) => p.id === 'tester_afk_pid');
+          if (self && !self.isAutoPlay) {
+            socket.off('game_state', handler);
+            resolve();
+          }
+        };
+        socket.on('game_state', handler);
+      });
+
+      socket.emit('resume_control', { roomId, playerId: 'tester_afk_pid' });
+
+      await Promise.all([controlResumedPromise, stateUpdatedPromise]);
+
+      expect(tester.isAutoPlay).toBe(false);
+      socket.disconnect();
+    });
+
+    it('resumes control even if playCards fails validation', () => {
+      let broadcastCount = 0;
+      const mockIo = {
+        to: () => ({ emit: () => {} }),
+        sockets: {
+          adapter: { rooms: new Map([['AFK_INVALID_PLAY', new Set(['sock_inv'])]]) },
+          sockets: new Map([['sock_inv', { emit: () => { broadcastCount++; }, playerId: 'p1' }]])
+        }
+      } as any;
+
+      const room = new Room('AFK_INVALID_PLAY', 'AFK Invalid Play Room', mockIo, {
+        fillWithBots: false,
+        turnTimerSeconds: 15
+      });
+
+      const p1 = room.addPlayer('p1', 'Player 1')!;
+      const p2 = room.addPlayer('p2', 'Player 2')!;
+      room.startGame();
+
+      // Make it p1's turn and mark p1 as AFK
+      room.state.currentTurnPlayerId = 'p1';
+      p1.isAutoPlay = true;
+      (room as any).botTimeout = setTimeout(() => {}, 5000);
+
+      // p1 attempts to play an invalid card (not in hand)
+      const res = room.playCards('p1', ['NON_EXISTENT_CARD']);
+      expect(res.success).toBe(false);
+      // But p1 should immediately be resumed to ON!
+      expect(p1.isAutoPlay).toBe(false);
+      expect((room as any).botTimeout).toBeNull();
+      expect(room.state.turnTimeRemaining).toBe(15);
+      expect(broadcastCount).toBeGreaterThan(0);
+
+      room.cleanup();
+    });
+
+    it('resumes control even if passTurn is not allowed (free turn)', () => {
+      let broadcastCount = 0;
+      const mockIo = {
+        to: () => ({ emit: () => {} }),
+        sockets: {
+          adapter: { rooms: new Map([['AFK_INVALID_PASS', new Set(['sock_pass'])]]) },
+          sockets: new Map([['sock_pass', { emit: () => { broadcastCount++; }, playerId: 'p1' }]])
+        }
+      } as any;
+
+      const room = new Room('AFK_INVALID_PASS', 'AFK Invalid Pass Room', mockIo, {
+        fillWithBots: false,
+        turnTimerSeconds: 15
+      });
+
+      const p1 = room.addPlayer('p1', 'Player 1')!;
+      const p2 = room.addPlayer('p2', 'Player 2')!;
+      room.startGame();
+
+      // Make it p1's turn with free turn (lastPlay is null) and mark p1 as AFK
+      room.state.currentTurnPlayerId = 'p1';
+      room.state.lastPlay = null;
+      p1.isAutoPlay = true;
+
+      // Pass is not allowed on free turn
+      const res = room.passTurn('p1');
+      expect(res.success).toBe(false);
+      // But p1 is resumed to manual ON!
+      expect(p1.isAutoPlay).toBe(false);
+      expect(broadcastCount).toBeGreaterThan(0);
+
+      room.cleanup();
+    });
+
+    it('resumes control when an AFK player sends a chat message over socket', async () => {
+      const socket = ClientSocket(`http://localhost:${port}`, {
+        transports: ['websocket']
+      });
+
+      await new Promise<void>((resolve) => socket.on('connect', resolve));
+
+      const roomId = 'AFK_CHAT_RM';
+      socket.emit('join_room', {
+        roomId,
+        playerName: 'Chatter',
+        avatar: '🐱',
+        playerId: 'chatter_pid'
+      });
+
+      await new Promise<void>((resolve) => socket.on('joined_room', () => resolve()));
+      socket.emit('start_game', { roomId });
+
+      await new Promise<void>((resolve) => {
+        socket.on('game_state', (s: any) => {
+          if (s.status === 'playing') resolve();
+        });
+      });
+
+      const room = roomManager.getRoom(roomId)!;
+      const chatter = room.getPlayer('chatter_pid')!;
+      chatter.isAutoPlay = true;
+      room.broadcastState();
+
+      // Send chat
+      socket.emit('send_chat', { roomId, playerId: 'chatter_pid', text: 'Halo saya kembali!' });
+
+      await new Promise<void>((resolve) => {
+        const handler = (s: any) => {
+          const self = s.players.find((p: any) => p.id === 'chatter_pid');
+          if (self && !self.isAutoPlay) {
+            socket.off('game_state', handler);
+            resolve();
+          }
+        };
+        socket.on('game_state', handler);
+      });
+
+      expect(chatter.isAutoPlay).toBe(false);
+      socket.disconnect();
+    });
+
+    it('resumes control when an AFK player reconnects via addPlayer', () => {
+      const mockIo = {
+        to: () => ({ emit: () => {} }),
+        sockets: { adapter: { rooms: new Map() }, sockets: new Map() }
+      } as any;
+
+      const room = new Room('AFK_RECONNECT', 'AFK Reconnect Room', mockIo, {
+        fillWithBots: false,
+        turnTimerSeconds: 15
+      });
+
+      const p1 = room.addPlayer('p1', 'Player 1')!;
+      room.addPlayer('p2', 'Player 2')!;
+      room.startGame();
+
+      p1.isAutoPlay = true;
+      p1.connected = false;
+
+      // Reconnect
+      room.addPlayer('p1', 'Player 1');
+
+      expect(p1.isAutoPlay).toBe(false);
+      expect(p1.connected).toBe(true);
+
+      room.cleanup();
+    });
   });
 });

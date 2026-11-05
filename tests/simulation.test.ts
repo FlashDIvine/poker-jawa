@@ -11,11 +11,15 @@ describe('End-to-End Game Simulation', () => {
 
     for (let g = 0; g < NUM_GAMES; g++) {
       const deck = shuffleDeck(createDeck());
-      const hands = dealDeck(deck, 4);
+      const rawHands = dealDeck(deck, 4);
 
-      let currentTurn = findPlayerWithThreeSpades(hands);
+      let currentTurn = findPlayerWithThreeSpades(rawHands);
       expect(currentTurn).toBeGreaterThanOrEqual(0);
       expect(currentTurn).toBeLessThan(4);
+
+      // Discard all 3s from all players hands at the start of the game
+      const hands = rawHands.map(h => h.filter(c => c.rank !== 3));
+      expect(hands.reduce((sum, h) => sum + h.length, 0)).toBe(48);
 
       let isFirstTurnOfGame = true;
       let lastPlay: PlayedTrick | null = null;
@@ -94,9 +98,10 @@ describe('End-to-End Game Simulation', () => {
     expect(room.state.status).toBe('playing');
     expect(room.state.players).toHaveLength(3);
 
-    // Verify 52 cards are dealt completely (18 + 17 + 17 = 52)
+    // Verify 48 cards remain after all four 3s are discarded (52 - 4 = 48)
     const totalCards = room.state.players.reduce((sum, p) => sum + p.cardCount, 0);
-    expect(totalCards).toBe(52);
+    expect(totalCards).toBe(48);
+    expect(room.state.players.every(p => !p.hand.some(c => c.rank === 3))).toBe(true);
 
     let turns = 0;
     while (room.state.status === 'playing' && turns < 300) {
@@ -133,11 +138,10 @@ describe('End-to-End Game Simulation', () => {
       expect(room.state.status).toBe('playing');
       expect(room.state.players).toHaveLength(2);
 
-      // Verify exactly 26 cards each
-      expect(room.state.players[0].cardCount).toBe(26);
-      expect(room.state.players[1].cardCount).toBe(26);
-      expect(room.state.players[0].hand).toHaveLength(26);
-      expect(room.state.players[1].hand).toHaveLength(26);
+      // Verify total 48 cards across both players after all four 3s are discarded (52 - 4 = 48)
+      expect(room.state.players[0].cardCount + room.state.players[1].cardCount).toBe(48);
+      expect(room.state.players[0].hand.length + room.state.players[1].hand.length).toBe(48);
+      expect(room.state.players.every(p => !p.hand.some(c => c.rank === 3))).toBe(true);
 
       let turns = 0;
       while (room.state.status === 'playing' && turns < 350) {

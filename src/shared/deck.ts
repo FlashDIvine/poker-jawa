@@ -23,29 +23,27 @@ export const RANK_LABELS: Record<number, string> = {
   15: '2'
 };
 
-export function createDeck(deckCount: number = 1): Card[] {
+export function createDeck(_deckCount: number = 1): Card[] {
   const suits: Suit[] = ['S', 'C', 'D', 'H'];
   const cards: Card[] = [];
 
-  for (let d = 0; d < deckCount; d++) {
-    for (let rank = 3; rank <= 15; rank++) {
-      for (const suit of suits) {
-        const suitInfo = SUIT_ORDER[suit];
-        const suffix = d === 0 ? '' : `_${d + 1}`;
-        cards.push({
-          id: `${RANK_LABELS[rank]}${suit}${suffix}`,
-          rank,
-          suit,
-          suitValue: suitInfo.value,
-          rankLabel: RANK_LABELS[rank],
-          suitSymbol: suitInfo.symbol,
-          suitName: suitInfo.name,
-          color: suitInfo.color,
-          isPoker: rank === 15,
-          isAce: rank === 14,
-          isThreeSpades: rank === 3 && suit === 'S'
-        });
-      }
+  // Strictly 1 deck (52 cards) always
+  for (let rank = 3; rank <= 15; rank++) {
+    for (const suit of suits) {
+      const suitInfo = SUIT_ORDER[suit];
+      cards.push({
+        id: `${RANK_LABELS[rank]}${suit}`,
+        rank,
+        suit,
+        suitValue: suitInfo.value,
+        rankLabel: RANK_LABELS[rank],
+        suitSymbol: suitInfo.symbol,
+        suitName: suitInfo.name,
+        color: suitInfo.color,
+        isPoker: rank === 15,
+        isAce: rank === 14,
+        isThreeSpades: rank === 3 && suit === 'S'
+      });
     }
   }
 

@@ -7,8 +7,8 @@ Permainan kartu Web Multiplayer Real-time berbasis varian khas **Poker Jawa / Ca
 ## 🌟 Fitur Utama
 
 1. **Aturan Otentik Poker Remi / Capsa Banting**:
-   - **52 Kartu** dibagikan habis ke 4 pemain (masing-masing 13 kartu).
-   - **Pembuka Permainan (Buang Angka 3)**: Pemain pertama wajib membuka permainan dengan membuang kartu angka 3 (satuan 3, pair 3, tris 3, dst).
+   - **Strictly 1 Dek (52 Kartu)** selalu digunakan dan dibagi habis ke seluruh pemain di meja (2 hingga 10 pemain).
+   - **Pembuka Permainan & Buang Angka 3 ("di awal game semua angka 3 dibuang dan pemegang 3♠ jalan duluan")**: Di awal permainan, pemain yang memegang 3 Waru (3♠) ditentukan sebagai pembuka langkah pertama, lalu seluruh kartu angka 3 dibuang secara otomatis dari tangan setiap pemain (tersisa 48 kartu aktif di meja). Pemain pembuka bebas mengeluarkan kombinasi sah pertama dari sisa kartunya.
    - **Aturan Tidak Boleh Tabrak Kartu yang Sama**: Kartu tidak boleh ditabrak/dilawan dengan angka yang sama (misal: 8 tidak boleh ditabrak 8; pair 8 tidak boleh ditabrak pair 8). Harus mengeluarkan angka yang lebih tinggi (9, 10, dst)!
    - **Hierarki Angka**: `3 < 4 < 5 < 6 < 7 < 8 < 9 < 10 < J < Q < K < As < 2 ("Poker")`.
    - **Hierarki Kembang (Suit)**: `♠ Waru/Sekop (1) < ♣ Keriting (2) < ♦ Wajik (3) < ♥ Hati (4)`.
@@ -24,7 +24,7 @@ Permainan kartu Web Multiplayer Real-time berbasis varian khas **Poker Jawa / Ca
    - **Mode Default (Remi)**: Tetap menjadi aturan baku bawaan (Satuan, Pair, Tris, Bong 4 kartu, Bong SF 4 kartu, Full House, Aturan Mutlak Pair, Dilarang tabrak angka sama, pembuka 3 Waru 3♠).
    - **Mode Poker Jawa (Aturan Tradisional)**: Sesuai aturan khas Poker Jawa (https://oldblog.rizkyaulya.info/2007/08/poker-jawa-permainan-kartu-paling.html):
      - Hierarki Kembang: `♠ Sekop > ♥ Hati > ♣ Keriting > ♦ Wajik`.
-     - Pembuka putaran pertama: **3 Wajik (3♦)**.
+     - Pembuka putaran pertama: **3 Wajik (3♦)** jika aturan buang 3 dinonaktifkan, atau **3 Waru (3♠)** saat aturan buang 3 aktif.
      - Boleh tabrak kartu berangka sama jika kembangnya lebih tinggi.
      - Hierarki Paket 5 Kartu: Seri (Straight) < Colour (Flush) < Full House (Polo) < Split (Piting: Color 3 kartu + Pair) < Flush (Straight Flush) < Royal Straight Flush.
      - Kombinasi Khusus: **Brother** (2 pasang pair berurutan), **Brother Panjang** (3 pasang pair berurutan), **Color Tris** (3 kartu sejenis kembang berurutan memotong Tris biasa).
@@ -33,8 +33,8 @@ Permainan kartu Web Multiplayer Real-time berbasis varian khas **Poker Jawa / Ca
 
 3. **Fleksibilitas 2 hingga 10 Pemain**:
    - Bebas bermain mulai dari 2 orang (duel 1 vs 1), bertiga, berempat, hingga 10 pemain.
-   - Manajemen kartu otomatis: 1 deck (52 kartu) untuk ≤ 5 pemain, dan 2 deck (104 kartu) otomatis untuk ≥ 6 pemain.
-   - Tampilan meja felt adaptif dinamis mendistribusikan lawan di sisi kiri, atas, dan kanan secara proporsional.
+   - Manajemen kartu: strictly 1 deck (52 kartu) selalu untuk seluruh jumlah pemain (2-10 orang).
+   - Tampilan meja felt adaptif dinamis mendistribusikan lawan di sisi luar felt meja (kiri, atas, dan kanan) agar meja lebih lega dan ergonomis untuk ponsel.
 
 4. **Mode Permainan & Lobi**:
    - **Main Instan vs AI Bot (1 Klik)**: Langsung main solo tanpa menunggu teman. AI pintar otomatis mengambil keputusan taktis sesuai aturan yang aktif.
@@ -49,10 +49,10 @@ Permainan kartu Web Multiplayer Real-time berbasis varian khas **Poker Jawa / Ca
 - **Backend**: Node.js, Express, Socket.io, TypeScript.
 - **Frontend**: React 19, Vite, Tailwind CSS, Lucide React, Canvas-confetti.
 - **Shared Logic**:
-  - `src/shared/deck.ts`: Pembuatan dek (1 atau 2 deck), pengocokan, pembagian kartu 2-10 pemain, pencarian pembuka (3 Waru / 3 Wajik).
+  - `src/shared/deck.ts`: Pembuatan dek strictly 1 deck (52 kartu), pengocokan, pembagian kartu 2-10 pemain, pencarian pembuka (3 Waru / 3 Wajik).
   - `src/shared/engine.ts`: Evaluasi kombinasi (Satuan, Pair, Tris, Bong, Full House, Straight, Colour, Split, Straight Flush, Royal Flush, Brother, Color Tris) dan validasi patah/banting kartu sesuai aturan meja.
   - `src/shared/bot.ts`: Algoritma AI bot cerdas dengan evaluasi langkah legal dan prioritas taktis sesuai aturan aktif.
-- **Testing**: Vitest (75 tes unit, evaluasi engine, Poker Jawa, simulasi 2-10 pemain, WebSocket integration test).
+- **Testing**: Vitest (suite tes unit komprehensif, evaluasi engine, Poker Jawa, simulasi 2-10 pemain, WebSocket integration test).
 
 ---
 
@@ -87,15 +87,15 @@ Buka browser di `http://localhost:3001`.
 ---
 
 ## 🧪 Menjalankan Tes
-Proyek ini dilengkapi dengan 75 tes menyeluruh mencakup seluruh varian aturan kartu, Poker Jawa, dan simulasi pertandingan:
+Proyek ini dilengkapi dengan tes menyeluruh mencakup seluruh varian aturan kartu, Poker Jawa, dan simulasi pertandingan:
 ```bash
 npm test
 ```
 Tes meliputi:
-- `tests/deck.test.ts`: Pembuatan 52 dan 104 kartu, pengacakan, pembagian kartu 2-10 pemain.
+- `tests/deck.test.ts`: Pembuatan strictly 52 kartu (1 deck), pengacakan, pembagian kartu 2-10 pemain.
 - `tests/pokerJawa.test.ts`: Pengujian lengkap kombinasi Poker Jawa, hierarki paket 5 kartu, Brother, Color Tris, sistem bom, dan pembuka 3 Wajik.
-- `tests/multiplayer.test.ts`: Pembagian deck 2-10 pemain dan simulasi pertandingan multi-pemain (5, 6, 8, 10 pemain).
-- `tests/engine.test.ts`: Pengenalan kombinasi, hierarki angka/kembang, patah kartu As, bom Poker 2 oleh Bong, penolakan kombinasi ilegal.
+- `tests/multiplayer.test.ts`: Pembagian deck 2-10 pemain (strictly 52 kartu) dan simulasi pertandingan multi-pemain (5, 6, 8, 10 pemain).
+- `tests/engine.test.ts`: Pengenalan kombinasi, hierarki angka/kembang, buang angka 3 di awal, patah kartu As, bom Poker 2 oleh Bong, penolakan kombinasi ilegal.
 - `tests/bot.test.ts`: Keputusan langkah bot, pencarian kombinasi, pembuka permainan.
 - `tests/simulation.test.ts`: Simulasi pertandingan lengkap dari awal hingga habis kartu untuk menjamin 0 deadlock.
-- `tests/server.test.ts`: Pengujian integrasi REST API dan Socket.IO real-time.
+- `tests/server.test.ts`: Pengujian integrasi REST API dan Socket.IO real-time (pembuangan angka 3, 3♠ starter, kebersihan obrolan, mode tanpa saran).

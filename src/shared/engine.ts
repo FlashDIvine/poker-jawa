@@ -830,6 +830,12 @@ export function validatePlay(
 
   // Opening lead of the game
   if (isFirstTurnOfGame) {
+    if (rules.discardThrees) {
+      // All 3s were automatically discarded from all players' hands at the start of the game.
+      // The first turn player can freely play their first legal combo from remaining cards.
+      return { valid: true, combo };
+    }
+
     if (rules.openingCard === '3D') {
       const hasThreeDiamond = cards.some(c => c.rank === 3 && c.suit === 'D');
       if (!hasThreeDiamond) {

@@ -2,11 +2,14 @@ class SoundManager {
   private ctx: AudioContext | null = null;
   public enabled: boolean = true;
   private isUnlocked: boolean = false;
+  private lastBooingTime: number = 0;
 
   constructor() {
-    const saved = localStorage.getItem('poker_remi_sound');
-    if (saved !== null) {
-      this.enabled = saved === 'true';
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('poker_remi_sound');
+      if (saved !== null) {
+        this.enabled = saved === 'true';
+      }
     }
 
     // Auto unlock AudioContext on first user interaction
@@ -30,7 +33,9 @@ class SoundManager {
 
   public toggle(): boolean {
     this.enabled = !this.enabled;
-    localStorage.setItem('poker_remi_sound', String(this.enabled));
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.setItem('poker_remi_sound', String(this.enabled));
+    }
     if (this.enabled) {
       this.initContext();
     }
@@ -266,6 +271,33 @@ class SoundManager {
     });
   }
 
+  // Control resumed chime (when human takes back control from AFK bot)
+  public playResumeControl(): void {
+    if (!this.enabled) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      const startTime = now + idx * 0.08;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, startTime);
+
+      gain.gain.setValueAtTime(0.22, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
+
+      osc.connect(gain);
+      gain.connect(this.ctx!.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + 0.25);
+    });
+  }
+
   // Melodic turn notification chime ("ding-dong") when it becomes player's turn
   public playTurnAlert(): void {
     if (!this.enabled) return;
@@ -430,6 +462,117 @@ class SoundManager {
       osc.start(startTime);
       osc.stop(startTime + duration);
     });
+  }
+
+  // Booing sound effect ("Huuuuuu!") when a player holds a poker card (rank 2) at game end
+  public playBooingSound(): void {
+    if (!this.enabled) return;
+    const nowMs = Date.now();
+    if (nowMs - this.lastBooingTime < 1000) return; // Prevent concurrent overlapping playback
+    this.lastBooingTime = nowMs;
+
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const duration = 2.4;
+
+      // Master Gain envelope
+      const masterGain = this.ctx.createGain();
+      masterGain.gain.setValueAtTime(0.001, now);
+      masterGain.gain.linearRampToValueAtTime(0.45, now + 0.35);
+      masterGain.gain.setValueAtTime(0.45, now + duration - 0.7);
+      masterGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      masterGain.connect(this.ctx.destination);
+
+      // Primary Formant Filter for vowel "U" ("Huuuu")
+      const formant1 = this.ctx.createBiquadFilter();
+      formant1.type = 'bandpass';
+      formant1.frequency.setValueAtTime(400, now);
+      formant1.frequency.exponentialRampToValueAtTime(300, now + duration);
+      formant1.Q.setValueAtTime(3.5, now);
+      formant1.connect(masterGain);
+
+      // Secondary Formant Filter for mid-range vocal harmonics
+      const formant2 = this.ctx.createBiquadFilter();
+      formant2.type = 'bandpass';
+      formant2.frequency.setValueAtTime(850, now);
+      formant2.frequency.exponentialRampToValueAtTime(700, now + duration);
+      formant2.Q.setValueAtTime(2.6, now);
+      const f2Gain = this.ctx.createGain();
+      f2Gain.gain.setValueAtTime(0.3, now);
+      f2Gain.connect(masterGain);
+      formant2.connect(f2Gain);
+
+      // Detuned chorus of crowd voices with downward pitch inflection
+      const voiceFreqs = [165, 178, 195, 142];
+      const types: OscillatorType[] = ['sawtooth', 'triangle', 'sawtooth', 'sine'];
+
+      voiceFreqs.forEach((freq, i) => {
+        const osc = this.ctx!.createOscillator();
+        const vGain = this.ctx!.createGain();
+        osc.type = types[i];
+        osc.frequency.setValueAtTime(freq, now);
+        // Downward slide typical of booing
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.72, now + duration);
+
+        vGain.gain.setValueAtTime(0.24, now);
+        osc.connect(vGain);
+        vGain.connect(formant1);
+        vGain.connect(formant2);
+
+        osc.start(now);
+        osc.stop(now + duration);
+      });
+
+      // Filtered crowd breath / noise layer
+      const sampleRate = this.ctx.sampleRate;
+      const bufferSize = Math.floor(sampleRate * duration);
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      const noiseSource = this.ctx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+
+      const noiseFilter = this.ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.setValueAtTime(450, now);
+      noiseFilter.frequency.exponentialRampToValueAtTime(320, now + duration);
+      noiseFilter.Q.setValueAtTime(3.8, now);
+
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.001, now);
+      noiseGain.gain.linearRampToValueAtTime(0.12, now + 0.3);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      noiseSource.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(masterGain);
+
+      noiseSource.start(now);
+      noiseSource.stop(now + duration);
+    } catch (e) {
+      // Audio fallback safety
+    }
+
+    // Voice vocalization overlay if browser SpeechSynthesis is available
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance('Huuuuuu!');
+        utterance.pitch = 0.5;
+        utterance.rate = 0.75;
+        utterance.volume = 0.9;
+        utterance.lang = 'id-ID';
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        // Ignore if blocked or unavailable
+      }
+    }
   }
 }
 

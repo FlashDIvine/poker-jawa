@@ -12,8 +12,8 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-2xl max-h-[85vh] bg-slate-900 border border-amber-500/30 rounded-3xl p-6 shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+      <div className="relative w-full max-w-2xl max-h-[92vh] bg-slate-900 border border-amber-500/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2">
@@ -140,7 +140,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                   <span>1. Jumlah Pemain Bebas (2 - 10 Orang) & Pembuka 3 Wajik (3♦)</span>
                 </div>
                 <p>
-                  Bisa dimainkan secara fleksibel dari <strong className="text-amber-300">2 hingga 10 orang pemain</strong>. Pada meja 6 pemain ke atas, deck kartu digandakan secara otomatis (2 deck / 104 kartu) agar setiap pemain memiliki kartu yang cukup. Pemain yang memegang <strong className="text-amber-300">3 Wajik (3♦ / 3 Diamond)</strong> berhak membuka langkah pertama.
+                  Bisa dimainkan secara fleksibel dari <strong className="text-amber-300">2 hingga 10 orang pemain</strong> menggunakan <strong className="text-amber-300">1 dek standar (52 kartu)</strong> yang dibagi habis ke seluruh pemain di meja. Pemain yang memegang kartu pembuka berhak membuka langkah pertama.
                 </p>
               </div>
 

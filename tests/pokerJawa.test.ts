@@ -319,26 +319,26 @@ describe('Poker Jawa Rules & Combinations', () => {
       const card3D = makeCard(3, 'D');
       const card3S = makeCard(3, 'S');
 
-      // In Poker Jawa, first turn with 3S fails if 3D is required
+      // In Poker Jawa (discardThrees: false, openingCard: '3D'), first turn with 3S fails and 3D succeeds
       const playWith3S = validatePlay([card3S], null, true, POKER_JAWA_RULES);
       expect(playWith3S.valid).toBe(false);
       expect(playWith3S.error).toContain('3♦ (3 Wajik)');
 
-      // Play with 3D succeeds
       const playWith3D = validatePlay([card3D], null, true, POKER_JAWA_RULES);
       expect(playWith3D.valid).toBe(true);
 
-      // In DEFAULT_RULES, 3 Waru (3♠) is strictly required! 3 Wajik must fail
-      const defPlay3S = validatePlay([card3S], null, true, DEFAULT_RULES);
+      // In traditional Remi with discardThrees: false, 3 Waru (3♠) is strictly required! 3 Wajik must fail
+      const rules3SNoDiscard = { ...DEFAULT_RULES, discardThrees: false };
+      const defPlay3S = validatePlay([card3S], null, true, rules3SNoDiscard);
       expect(defPlay3S.valid).toBe(true);
 
-      const defPlay3D = validatePlay([card3D], null, true, DEFAULT_RULES);
+      const defPlay3D = validatePlay([card3D], null, true, rules3SNoDiscard);
       expect(defPlay3D.valid).toBe(false);
       expect(defPlay3D.error).toContain('3 Waru (3♠)');
 
+      // In DEFAULT_RULES (discardThrees: true), all 3s are discarded at game start so any legal play is valid
       const defPlayKing = validatePlay([makeCard(13, 'S')], null, true, DEFAULT_RULES);
-      expect(defPlayKing.valid).toBe(false);
-      expect(defPlayKing.error).toContain('3 Waru (3♠)');
+      expect(defPlayKing.valid).toBe(true);
     });
   });
 

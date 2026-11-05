@@ -286,20 +286,35 @@ describe('Engine - canBeat rules', () => {
 });
 
 describe('Engine - validatePlay & Opening Lead rule', () => {
-  it('first turn of game MUST contain 3 Waru (3♠)', () => {
+  it('opening turn when discardThrees is true (default) allows any legal combo from remaining cards', () => {
+    // Under default Indonesian Remi rules, all 3s are discarded before the first play.
+    // The player holding 3♠ starts and can play any legal combination from their remaining hand.
+    const fourSpades = [makeCard(4, 'S')];
+    expect(validatePlay(fourSpades, null, true).valid).toBe(true);
+
+    const pairFours = [makeCard(4, 'S'), makeCard(4, 'H')];
+    expect(validatePlay(pairFours, null, true).valid).toBe(true);
+
+    // Invalid combo still rejected
+    const invalidCombo = [makeCard(4, 'S'), makeCard(5, 'H')];
+    expect(validatePlay(invalidCombo, null, true).valid).toBe(false);
+  });
+
+  it('opening turn when discardThrees is false strictly requires 3 Waru (3♠)', () => {
+    const rulesNoDiscard = { ...DEFAULT_RULES, discardThrees: false };
     const threeSpades = [makeCard(3, 'S')];
     const threeHearts = [makeCard(3, 'H')];
     const pairWith3S = [makeCard(3, 'S'), makeCard(3, 'H')];
 
-    expect(validatePlay(threeSpades, null, true).valid).toBe(true);
-    expect(validatePlay(pairWith3S, null, true).valid).toBe(true);
+    expect(validatePlay(threeSpades, null, true, rulesNoDiscard).valid).toBe(true);
+    expect(validatePlay(pairWith3S, null, true, rulesNoDiscard).valid).toBe(true);
 
-    const invalidStart = validatePlay(threeHearts, null, true);
+    const invalidStart = validatePlay(threeHearts, null, true, rulesNoDiscard);
     expect(invalidStart.valid).toBe(false);
     expect(invalidStart.error).toContain('3 Waru (3♠)');
 
     const fourSpades = [makeCard(4, 'S')];
-    const invalidFour = validatePlay(fourSpades, null, true);
+    const invalidFour = validatePlay(fourSpades, null, true, rulesNoDiscard);
     expect(invalidFour.valid).toBe(false);
     expect(invalidFour.error).toContain('3 Waru (3♠)');
   });
@@ -341,7 +356,7 @@ describe('Engine - validatePlay & Opening Lead rule', () => {
   });
 
   it('opening turn allows any combo containing rank 3 when configured for any_3', () => {
-    const rulesAny3 = { ...DEFAULT_RULES, openingCard: 'any_3' as const };
+    const rulesAny3 = { ...DEFAULT_RULES, discardThrees: false, openingCard: 'any_3' as const };
     const single3D = [makeCard(3, 'D')];
     expect(validatePlay(single3D, null, true, rulesAny3).valid).toBe(true);
 

@@ -33,9 +33,13 @@ export class Room {
     this.fillWithBots = options?.fillWithBots ?? false;
     this.turnTimerSeconds = options?.turnTimerSeconds || 15;
     this.maxPlayers = options?.maxPlayers ? Math.min(10, Math.max(2, options.maxPlayers)) : 4;
-    this.rules = { ...DEFAULT_RULES, ...(options?.rules || {}) };
-    if (this.rules.deckCount === '1' as any) this.rules.deckCount = 1;
-    if (this.rules.deckCount === '2' as any) this.rules.deckCount = 2;
+    this.rules = {
+      ...DEFAULT_RULES,
+      deckCount: 1,
+      discardThrees: true,
+      ...(options?.rules || {})
+    };
+    this.rules.deckCount = 1;
 
     this.state = {
       roomId: this.id,
@@ -55,7 +59,9 @@ export class Room {
       isFirstTurnOfGame: true,
       leadPlayerId: null,
       winnerId: null,
-      results: null
+      results: null,
+      hasPokerBooing: false,
+      pokerLoserNames: []
     };
   }
 
@@ -70,6 +76,7 @@ export class Room {
       existing.connected = true;
       existing.name = name || existing.name;
       existing.avatar = avatar || existing.avatar;
+      this.resumeControl(id);
       this.broadcastState();
       return existing;
     }
@@ -89,7 +96,8 @@ export class Room {
             connected: true,
             isHost: false,
             seatIndex: botIdx,
-            score: 0
+            score: 0,
+            isAutoPlay: false
           };
           this.state.players[botIdx] = newPlayer;
           this.broadcastSystemChat(`${newPlayer.name} telah bergabung ke meja (menggantikan Bot).`);
@@ -114,7 +122,8 @@ export class Room {
       connected: true,
       isHost,
       seatIndex,
-      score: 0
+      score: 0,
+      isAutoPlay: false
     };
 
     this.state.players.push(newPlayer);
@@ -187,9 +196,8 @@ export class Room {
       player.seatIndex = idx;
     });
 
-    // Deal cards (dibagi habis ke semua pemain)
-    const useTwoDecks = Number(this.rules.deckCount) === 2 || (this.rules.deckCount === 'auto' && this.state.players.length >= 6);
-    const deck = shuffleDeck(createDeck(useTwoDecks ? 2 : 1));
+    // Deal cards (strictly 1 deck of 52 cards, divided cleanly among all players)
+    const deck = shuffleDeck(createDeck(1));
     const hands = dealDeck(deck, this.state.players.length);
 
     this.finishers = [];
@@ -200,11 +208,24 @@ export class Room {
       player.cardCount = hands[idx].length;
       player.passed = false;
       player.finishRank = null;
+      player.isAutoPlay = false;
     });
 
-    // Find starter with opening card (3 Waru / 3 Wajik)
-    const starterIdx = findStarterPlayer(hands, this.rules.openingCard);
+    // Find starter with opening card before discarding 3s.
+    // If discardThrees is active, the player holding 3 of Spades (3♠ / Waru) ALWAYS starts the game!
+    const starterIdx = (this.rules.discardThrees !== false)
+      ? findStarterPlayer(hands, '3S')
+      : findStarterPlayer(hands, this.rules.openingCard);
     const starter = this.state.players[starterIdx];
+
+    // Automatically discard ALL rank 3 cards from all players' hands!
+    if (this.rules.discardThrees !== false) {
+      this.state.players.forEach(player => {
+        player.hand = player.hand.filter(c => c.rank !== 3);
+        player.cardCount = player.hand.length;
+      });
+      this.rules.discardThrees = true;
+    }
 
     if (this.state.results) {
       this.state.roundNumber++;
@@ -219,16 +240,21 @@ export class Room {
     this.state.isFirstTurnOfGame = true;
     this.state.winnerId = null;
     this.state.results = null;
+    this.state.hasPokerBooing = false;
+    this.state.pokerLoserNames = [];
 
-    const starterCardName = this.rules.openingCard === '3D' ? '3 Wajik (3♦)' : '3 Waru (3♠)';
-    this.broadcastSystemChat(`Permainan dimulai! ${starter.name} memegang ${starterCardName} dan membuka langkah pertama.`);
+    const starterCardName = (this.rules.discardThrees !== false || this.rules.openingCard === '3S')
+      ? '3 Waru (3♠)'
+      : (this.rules.openingCard === '3D' ? '3 Wajik (3♦)' : 'angka 3');
+    const discardInfo = this.rules.discardThrees !== false ? 'Semua kartu angka 3 telah dibuang. ' : '';
+    this.broadcastSystemChat(`Permainan dimulai! ${discardInfo}${starter.name} memegang ${starterCardName} dan membuka langkah pertama.`);
     this.startTurnTimer();
     this.broadcastState();
     this.triggerBotTurnIfNeeded();
     return true;
   }
 
-  public playCards(playerId: string, cardIds: string[]): { success: boolean; error?: string } {
+  public playCards(playerId: string, cardIds: string[], isAutoAction: boolean = false): { success: boolean; error?: string } {
     if (this.state.status !== 'playing') {
       return { success: false, error: 'Permainan belum aktif.' };
     }
@@ -240,6 +266,10 @@ export class Room {
     const player = this.getPlayer(playerId);
     if (!player) {
       return { success: false, error: 'Pemain tidak ditemukan.' };
+    }
+
+    if (!isAutoAction && (player.isAutoPlay || !player.connected)) {
+      this.resumeControl(playerId);
     }
 
     const playedCards = player.hand.filter(c => cardIds.includes(c.id));
@@ -277,9 +307,6 @@ export class Room {
     this.state.consecutivePasses = 0; // Reset consecutive pass counter setiap kali kartu baru dikeluarkan
     this.state.players.forEach(p => (p.passed = false)); // Reset status lewat: saat giliran berputar, pemain lain masih bisa jalan lagi
 
-    // Announce the play
-    this.broadcastSystemChat(`${player.name} mengeluarkan: ${validation.combo.description}`);
-
     // Check if THIS player just ran out of cards!
     if (player.hand.length === 0 && !player.finishRank) {
       const rank = this.finishers.length + 1;
@@ -296,9 +323,6 @@ export class Room {
         // Hanya tersisa 1 pemegang kartu terakhir -> Game selesai!
         if (remainingActive.length === 1) {
           const lastPlayer = remainingActive[0];
-          lastPlayer.finishRank = this.finishers.length + 1;
-          this.finishers.push(lastPlayer.id);
-          this.state.finishers = [...this.finishers];
           this.broadcastSystemChat(`🏁 Permainan selesai! ${lastPlayer.name} memegang kartu terakhir.`);
         }
         this.handleGameOver();
@@ -311,7 +335,7 @@ export class Room {
     return { success: true };
   }
 
-  public passTurn(playerId: string): { success: boolean; error?: string } {
+  public passTurn(playerId: string, isAutoAction: boolean = false): { success: boolean; error?: string } {
     if (this.state.status !== 'playing') {
       return { success: false, error: 'Permainan belum aktif.' };
     }
@@ -320,19 +344,22 @@ export class Room {
       return { success: false, error: 'Bukan giliran Anda!' };
     }
 
+    const player = this.getPlayer(playerId);
+    if (!player) return { success: false, error: 'Pemain tidak ditemukan.' };
+
+    if (!isAutoAction && (player.isAutoPlay || !player.connected)) {
+      this.resumeControl(playerId);
+    }
+
     if (this.state.isFirstTurnOfGame) {
-      return { success: false, error: 'Pemain pembuka tidak boleh lewat pada giliran pertama (wajib buang angka 3)!' };
+      return { success: false, error: 'Pemain pembuka tidak boleh lewat pada giliran pertama!' };
     }
 
     if (!this.state.lastPlay) {
       return { success: false, error: 'Anda memiliki giliran bebas, Anda harus memimpin kartu!' };
     }
 
-    const player = this.getPlayer(playerId);
-    if (!player) return { success: false, error: 'Pemain tidak ditemukan.' };
-
     player.passed = true;
-    this.broadcastSystemChat(`${player.name} memilih Lewat (Pass).`);
 
     this.state.consecutivePasses++;
     const activePlayers = this.state.players.filter(p => p.hand.length > 0);
@@ -344,11 +371,9 @@ export class Room {
       let winner: Player;
       if (isLeadActive) {
         winner = this.getPlayer(this.state.leadPlayerId || '') || player;
-        this.broadcastSystemChat(`Semua pemain lain lewat! ${winner.name} memenangkan putaran dan memimpin babak baru.`);
       } else {
         // Jika pemenang putaran sebelumnya sudah habis kartunya, serahkan meja bebas ke pemain aktif berikutnya
         winner = this.getNextActivePlayer(this.state.leadPlayerId || '');
-        this.broadcastSystemChat(`Semua pemain lain lewat! Meja bebas diserahkan kepada ${winner.name}.`);
       }
 
       this.state.lastPlay = null;
@@ -423,17 +448,54 @@ export class Room {
     }, 1000);
   }
 
-  private handleTurnTimeout(): void {
+  public resumeControl(playerId: string): boolean {
+    const player = this.getPlayer(playerId);
+    if (!player || player.isBot) return false;
+
+    const wasAutoPlay = Boolean(player.isAutoPlay);
+    const wasDisconnected = !player.connected;
+
+    if (!wasAutoPlay && !wasDisconnected) {
+      return false;
+    }
+
+    player.isAutoPlay = false;
+    player.connected = true;
+
+    if (wasAutoPlay) {
+      this.broadcastSystemChat(`🎮 ${player.name} kembali mengambil alih permainan (ON).`);
+    }
+
+    if (this.state.currentTurnPlayerId === playerId) {
+      if (this.botTimeout) {
+        clearTimeout(this.botTimeout);
+        this.botTimeout = null;
+      }
+      this.startTurnTimer();
+    }
+
+    this.broadcastState();
+    return true;
+  }
+
+  public handleTurnTimeout(): void {
     if (this.state.status !== 'playing' || !this.state.currentTurnPlayerId) return;
 
     const currentPlayer = this.getPlayer(this.state.currentTurnPlayerId);
     if (!currentPlayer) return;
 
-    // Timeout: bot logic takes the move automatically
+    // Timeout: player did not act / touch cards in this turn.
+    // Next turns will be taken over by bot (auto-play / AFK takeover)
+    if (!currentPlayer.isBot && !currentPlayer.isAutoPlay) {
+      currentPlayer.isAutoPlay = true;
+      this.broadcastSystemChat(`⏳ ${currentPlayer.name} tidak merespons dalam 1 giliran. Giliran selanjutnya akan dimainkan otomatis oleh Bot.`);
+    }
+
+    // Bot logic takes the move automatically
     const move = decideBotMove(currentPlayer.hand, this.state.lastPlay, this.state.isFirstTurnOfGame, this.rules);
 
     if (move && move.length > 0) {
-      this.playCards(currentPlayer.id, move.map(c => c.id));
+      this.playCards(currentPlayer.id, move.map(c => c.id), true);
     } else {
       if (this.state.isFirstTurnOfGame || !this.state.lastPlay) {
         // Must play something
@@ -444,14 +506,14 @@ export class Room {
               ? currentPlayer.hand.find(c => c.isThreeSpades || (c.rank === 3 && c.suit === 'S'))
               : null) || currentPlayer.hand.find(c => c.rank === 3)
           : null) || currentPlayer.hand[0];
-        this.playCards(currentPlayer.id, [fallback.id]);
+        this.playCards(currentPlayer.id, [fallback.id], true);
       } else {
-        this.passTurn(currentPlayer.id);
+        this.passTurn(currentPlayer.id, true);
       }
     }
   }
 
-  private triggerBotTurnIfNeeded(): void {
+  public triggerBotTurnIfNeeded(): void {
     if (this.botTimeout) {
       clearTimeout(this.botTimeout);
       this.botTimeout = null;
@@ -462,17 +524,23 @@ export class Room {
     const currentPlayer = this.getPlayer(this.state.currentTurnPlayerId);
     if (!currentPlayer) return;
 
-    // Trigger if player is a bot or if human is currently disconnected
-    if (currentPlayer.isBot || !currentPlayer.connected) {
-      // Natural thinking delay between 900ms and 1500ms
-      const delay = Math.floor(Math.random() * 600) + 900;
+    // Trigger if player is a bot or if human is currently disconnected or in auto-play (AFK takeover)
+    if (currentPlayer.isBot || !currentPlayer.connected || currentPlayer.isAutoPlay) {
+      // Natural thinking delay: bots play quickly (800-1300ms),
+      // but AFK humans get 2500-3300ms so they have ample time to tap and take back manual control!
+      const delay = currentPlayer.isBot
+        ? Math.floor(Math.random() * 500) + 800
+        : Math.floor(Math.random() * 800) + 2500;
+
       this.botTimeout = setTimeout(() => {
         if (this.state.status !== 'playing' || this.state.currentTurnPlayerId !== currentPlayer.id) return;
+        // Strictly prevent bot move if human has taken back control
+        if (!currentPlayer.isBot && currentPlayer.connected && !currentPlayer.isAutoPlay) return;
 
         const move = decideBotMove(currentPlayer.hand, this.state.lastPlay, this.state.isFirstTurnOfGame, this.rules);
 
         if (move && move.length > 0) {
-          this.playCards(currentPlayer.id, move.map(c => c.id));
+          this.playCards(currentPlayer.id, move.map(c => c.id), true);
         } else {
           if (this.state.isFirstTurnOfGame || !this.state.lastPlay) {
             const fallback = (this.state.isFirstTurnOfGame
@@ -482,9 +550,9 @@ export class Room {
                   ? currentPlayer.hand.find(c => c.isThreeSpades || (c.rank === 3 && c.suit === 'S'))
                   : null) || currentPlayer.hand.find(c => c.rank === 3)
               : null) || currentPlayer.hand[0];
-            this.playCards(currentPlayer.id, [fallback.id]);
+            this.playCards(currentPlayer.id, [fallback.id], true);
           } else {
-            this.passTurn(currentPlayer.id);
+            this.passTurn(currentPlayer.id, true);
           }
         }
       }, delay);
@@ -501,12 +569,48 @@ export class Room {
       this.botTimeout = null;
     }
 
-    // Pastikan seluruh pemain yang belum masuk finishers (pemegang kartu terakhir) dicatat
-    const remaining = this.state.players.filter(p => !this.finishers.includes(p.id));
-    remaining.forEach(p => {
-      p.finishRank = this.finishers.length + 1;
-      this.finishers.push(p.id);
+    // 1. Pemain yang sudah berhasil menghabiskan seluruh kartunya sebelum game over
+    const finishedPlayers = this.finishers
+      .map(id => this.getPlayer(id))
+      .filter((p): p is Player => p !== undefined && p.hand.length === 0);
+
+    // 2. Pemain yang masih memegang sisa kartu saat permainan berakhir
+    const remainingPlayers = this.state.players.filter(p => p.hand.length > 0);
+
+    // Pisahkan pemain yang tidak memegang poker vs yang memegang kartu poker (angka 2)
+    const remainingWithoutPoker = remainingPlayers.filter(
+      p => !p.hand.some(c => c.isPoker || c.rank === 15)
+    );
+    const remainingWithPoker = remainingPlayers.filter(
+      p => p.hand.some(c => c.isPoker || c.rank === 15)
+    );
+
+    // Yang tidak memegang poker diurutkan berdasarkan sisa kartu paling sedikit ke terbanyak
+    remainingWithoutPoker.sort((a, b) => a.hand.length - b.hand.length);
+
+    // Pemegang kartu poker LANGSUNG KALAH dan berperingkat paling buncit (dead last).
+    // Pemegang kartu poker lebih banyak berperingkat lebih buruk (mendekati posisi paling buncit).
+    remainingWithPoker.sort((a, b) => {
+      const pokerA = a.hand.filter(c => c.isPoker || c.rank === 15).length;
+      const pokerB = b.hand.filter(c => c.isPoker || c.rank === 15).length;
+      if (pokerA !== pokerB) {
+        return pokerA - pokerB; // Sedikit kartu poker lebih baik daripada banyak kartu poker
+      }
+      return a.hand.length - b.hand.length;
     });
+
+    const finalOrder = [
+      ...finishedPlayers,
+      ...remainingWithoutPoker,
+      ...remainingWithPoker
+    ];
+
+    // Berikan peringkat 1..N
+    finalOrder.forEach((player, idx) => {
+      player.finishRank = idx + 1;
+    });
+
+    this.finishers = finalOrder.map(p => p.id);
     this.state.finishers = [...this.finishers];
 
     this.state.status = 'game_over';
@@ -514,22 +618,29 @@ export class Room {
 
     const winner = this.getPlayer(this.finishers[0] || '');
 
-    // Hitung ranking dan penalti berdasarkan urutan habisnya kartu (finishers)
+    // Cek pemain yang kena booing karena masih memegang kartu poker di akhir game
+    const pokerLosers = remainingWithPoker;
+    this.state.hasPokerBooing = pokerLosers.length > 0;
+    this.state.pokerLoserNames = pokerLosers.map(p => p.name);
+
+    const totalPlayers = this.state.players.length;
     const results: GameResult[] = this.state.players.map(p => {
       const rank = p.finishRank || (this.finishers.indexOf(p.id) + 1);
+      const pokerCards = p.hand.filter(c => c.isPoker || c.rank === 15);
+      const hasPoker = pokerCards.length > 0;
+
       let penalty = p.hand.length;
-      const hasPoker = p.hand.some(c => c.isPoker);
       if (hasPoker) {
-        penalty *= 2; // Capsa banting rule: caught holding Poker doubles penalty!
+        // Double penalty per poker card held
+        penalty = penalty * Math.pow(2, pokerCards.length);
       }
 
       let scoreDelta = 0;
       if (rank === 1) {
         scoreDelta = 30;
-      } else if (rank === 2 && this.state.players.length >= 4) {
-        scoreDelta = 10;
-      } else if (rank === 2 && this.state.players.length === 3) {
-        scoreDelta = 0;
+      } else if (rank === 2 && p.hand.length === 0) {
+        // Hanya mendapatkan poin positif jika benar-benar berhasil menghabiskan kartu di tangan
+        scoreDelta = totalPlayers >= 4 ? 10 : 0;
       } else {
         scoreDelta = -penalty;
       }
@@ -544,7 +655,9 @@ export class Room {
         rank,
         remainingCards: p.hand.length,
         scoreDelta,
-        isWinner: rank === 1
+        isWinner: rank === 1,
+        caughtHoldingPoker: hasPoker,
+        pokerCardsCount: pokerCards.length
       };
     });
 
@@ -555,6 +668,14 @@ export class Room {
     if (winner) {
       this.broadcastSystemChat(`🏆 ${winner.name} ADALAH JUARA 1 PERTANDINGAN!`);
     }
+
+    if (pokerLosers.length > 0) {
+      const loserNames = pokerLosers.map(p => p.name).join(', ');
+      this.broadcastSystemChat(
+        `📢 HUUUUUU! 👎 ${loserNames} masih memegang kartu Poker (angka 2) di akhir permainan dan langsung kalah!`
+      );
+    }
+
     this.broadcastState();
   }
 
@@ -656,6 +777,8 @@ export class Room {
     this.state.consecutivePasses = 0;
     this.state.winnerId = null;
     this.state.results = null;
+    this.state.hasPokerBooing = false;
+    this.state.pokerLoserNames = [];
     this.finishers = [];
     this.state.finishers = [];
     this.state.players.forEach(p => {
@@ -663,6 +786,7 @@ export class Room {
       p.cardCount = 0;
       p.passed = false;
       p.finishRank = null;
+      p.isAutoPlay = false;
     });
 
     this.broadcastSystemChat('Meja siap untuk ronde berikutnya. Klik Mulai saat siap!');

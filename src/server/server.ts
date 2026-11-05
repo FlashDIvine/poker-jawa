@@ -158,6 +158,8 @@ io.on('connection', (socket) => {
     const pid = playerId || currentPlayerId;
     if (!pid || !text) return;
 
+    // Chatting indicates player is active at their device
+    room.resumeControl(pid);
     room.addChatMessage(pid, text);
   });
 
@@ -167,6 +169,23 @@ io.on('connection', (socket) => {
     if (!room) return;
 
     room.resetForNextGame();
+  });
+
+  socket.on('resume_control', (payload) => {
+    const { roomId, playerId } = payload || {};
+    const code = (roomId || currentRoomId || '').toUpperCase();
+    const room = roomManager.getRoom(code);
+    if (!room) return;
+
+    const pid = playerId || currentPlayerId;
+    if (!pid) return;
+
+    const resumed = room.resumeControl(pid);
+    // Always emit control_resumed and broadcast state so client UI is guaranteed to sync to ON
+    socket.emit('control_resumed', { playerId: pid });
+    if (!resumed) {
+      room.broadcastState();
+    }
   });
 
   socket.on('disconnect', () => {

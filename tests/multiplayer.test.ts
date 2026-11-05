@@ -6,14 +6,14 @@ import { validatePlay, evaluateCombo } from '../src/shared/engine.js';
 
 describe('Multiplayer 2 to 10 Players Support', () => {
   describe('Deck Creation and Dealing across 2 to 10 players', () => {
-    it('creates 1 deck (52 cards) and 2 decks (104 cards)', () => {
+    it('creates strictly 1 deck (52 cards) and never exceeds 52 cards', () => {
       const single = createDeck(1);
       expect(single).toHaveLength(52);
       expect(new Set(single.map(c => c.id)).size).toBe(52);
 
-      const double = createDeck(2);
-      expect(double).toHaveLength(104);
-      expect(new Set(double.map(c => c.id)).size).toBe(104);
+      const doubleAttempt = createDeck(2);
+      expect(doubleAttempt).toHaveLength(52);
+      expect(new Set(doubleAttempt.map(c => c.id)).size).toBe(52);
     });
 
     it('deals 52 cards cleanly for 2, 3, 4, and 5 players (1 deck)', () => {
@@ -43,16 +43,16 @@ describe('Multiplayer 2 to 10 Players Support', () => {
       expect(h5[4].length).toBe(10);
     });
 
-    it('deals 104 cards cleanly for 6, 7, 8, 9, and 10 players (2 decks)', () => {
+    it('deals 52 cards cleanly for 6, 7, 8, 9, and 10 players (strictly <= 52 cards)', () => {
       for (let pCount = 6; pCount <= 10; pCount++) {
-        const hands = dealDeck(shuffleDeck(createDeck(2)), pCount);
+        const hands = dealDeck(shuffleDeck(createDeck(1)), pCount);
         expect(hands).toHaveLength(pCount);
         const total = hands.reduce((s, h) => s + h.length, 0);
-        expect(total).toBe(104);
+        expect(total).toBe(52);
 
-        // Every player gets at least 10 cards
+        // Every player gets at least 5 cards
         for (const h of hands) {
-          expect(h.length).toBeGreaterThanOrEqual(10);
+          expect(h.length).toBeGreaterThanOrEqual(5);
         }
       }
     });
@@ -75,27 +75,26 @@ describe('Multiplayer 2 to 10 Players Support', () => {
   describe('Full Game Simulations (2-10 players)', () => {
     // Helper to simulate a full game among N bots
     const simulateGame = (numPlayers: number, rules = DEFAULT_RULES) => {
-      const deckCount = rules.deckCount === 'auto'
-        ? (numPlayers >= 6 ? 2 : 1)
-        : Number(rules.deckCount || 1);
-
-      const deck = shuffleDeck(createDeck(deckCount));
+      const deck = shuffleDeck(createDeck(1));
       const hands = dealDeck(deck, numPlayers);
       const starterIdx = findStarterPlayer(hands, rules.openingCard);
 
-      const players: Player[] = hands.map((hand, idx) => ({
-        id: `player_${idx}`,
-        name: `Bot ${idx + 1}`,
-        avatar: '🤖',
-        isHost: idx === 0,
-        isBot: true,
-        hand: [...hand],
-        cardCount: hand.length,
-        seatIndex: idx,
-        passed: false,
-        connected: true,
-        score: 0
-      }));
+      const players: Player[] = hands.map((hand, idx) => {
+        const finalHand = rules.discardThrees ? hand.filter(c => c.rank !== 3) : [...hand];
+        return {
+          id: `player_${idx}`,
+          name: `Bot ${idx + 1}`,
+          avatar: '🤖',
+          isHost: idx === 0,
+          isBot: true,
+          hand: finalHand,
+          cardCount: finalHand.length,
+          seatIndex: idx,
+          passed: false,
+          connected: true,
+          score: 0
+        };
+      });
 
       let currentTurnIdx = starterIdx;
       let lastPlay: any = null;
@@ -175,15 +174,15 @@ describe('Multiplayer 2 to 10 Players Support', () => {
       simulateGame(5, DEFAULT_RULES);
     });
 
-    it('simulates 6-player game with POKER_JAWA_RULES (2 decks)', () => {
+    it('simulates 6-player game with POKER_JAWA_RULES (1 deck / 52 cards)', () => {
       simulateGame(6, POKER_JAWA_RULES);
     });
 
-    it('simulates 8-player game with POKER_JAWA_RULES (2 decks)', () => {
+    it('simulates 8-player game with POKER_JAWA_RULES (1 deck / 52 cards)', () => {
       simulateGame(8, POKER_JAWA_RULES);
     });
 
-    it('simulates 10-player game with POKER_JAWA_RULES (2 decks)', () => {
+    it('simulates 10-player game with POKER_JAWA_RULES (1 deck / 52 cards)', () => {
       simulateGame(10, POKER_JAWA_RULES);
     });
   });

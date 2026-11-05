@@ -17,8 +17,10 @@ export const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [lastReadChatCount, setLastReadChatCount] = useState(0);
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showGameOverModal, setShowGameOverModal] = useState(false);
 
   const prevLastPlayRef = useRef<any>(null);
   const prevStatusRef = useRef<string>('waiting');
@@ -26,6 +28,7 @@ export const App: React.FC = () => {
   const prevPassedMapRef = useRef<Record<string, boolean>>({});
   const playerIdRef = useRef<string>('');
   const selfJustPassedRef = useRef<boolean>(false);
+  const prevAutoPlayRef = useRef<boolean>(false);
 
   // Initialize player identity from localStorage
   useEffect(() => {
@@ -77,7 +80,14 @@ export const App: React.FC = () => {
 
       // Audio trigger on game over
       if (prevStatusRef.current === 'playing' && state.status === 'game_over') {
-        sounds.playWinFanfare();
+        if (state.hasPokerBooing || state.results?.some(r => r.caughtHoldingPoker)) {
+          sounds.playBooingSound();
+          setTimeout(() => {
+            sounds.playWinFanfare();
+          }, 1500);
+        } else {
+          sounds.playWinFanfare();
+        }
       }
       prevStatusRef.current = state.status;
 
@@ -138,7 +148,20 @@ export const App: React.FC = () => {
       }
       prevTurnPlayerRef.current = state.currentTurnPlayerId;
 
+      // Audio trigger when human takes back control (isAutoPlay changes from true to false)
+      const myPlayer = state.players.find(p => p.id === myPid);
+      if (myPlayer) {
+        if (prevAutoPlayRef.current && !myPlayer.isAutoPlay) {
+          sounds.playResumeControl();
+        }
+        prevAutoPlayRef.current = Boolean(myPlayer.isAutoPlay);
+      }
+
       setGameState(state);
+    });
+
+    newSocket.on('control_resumed', () => {
+      sounds.playResumeControl();
     });
 
     newSocket.on('turn_tick', ({ timeRemaining, playerId: currentPid }) => {
@@ -216,8 +239,28 @@ export const App: React.FC = () => {
     socket.emit('start_game', { roomId: gameState.roomId });
   };
 
+  const handleResumeControl = () => {
+    if (!socket || !gameState) return;
+    sounds.playResumeControl();
+    // Optimistically clear isAutoPlay locally for instantaneous 0ms UI feedback (ON)
+    setGameState(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        players: prev.players.map(p => (p.id === playerId ? { ...p, isAutoPlay: false } : p))
+      };
+    });
+    socket.emit('resume_control', {
+      roomId: gameState.roomId,
+      playerId
+    });
+  };
+
   const handlePlayCards = (cardIds: string[]) => {
     if (!socket || !gameState) return;
+    if (me?.isAutoPlay) {
+      handleResumeControl();
+    }
     socket.emit('play_cards', {
       roomId: gameState.roomId,
       playerId,
@@ -227,6 +270,9 @@ export const App: React.FC = () => {
 
   const handlePassTurn = () => {
     if (!socket || !gameState) return;
+    if (me?.isAutoPlay) {
+      handleResumeControl();
+    }
     selfJustPassedRef.current = true;
     socket.emit('pass_turn', {
       roomId: gameState.roomId,
@@ -236,6 +282,9 @@ export const App: React.FC = () => {
 
   const handleSendMessage = (text: string) => {
     if (!socket || !gameState) return;
+    if (me?.isAutoPlay) {
+      handleResumeControl();
+    }
     socket.emit('send_chat', {
       roomId: gameState.roomId,
       playerId,
@@ -255,10 +304,46 @@ export const App: React.FC = () => {
     }
     setGameState(null);
     setChatMessages([]);
+    setLastReadChatCount(0);
   };
+
+  const handleToggleChat = () => {
+    setIsChatOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setLastReadChatCount(chatMessages.length);
+      }
+      return next;
+    });
+  };
+
+  // If chat is actively open, keep lastReadChatCount current
+  useEffect(() => {
+    if (isChatOpen) {
+      setLastReadChatCount(chatMessages.length);
+    }
+  }, [isChatOpen, chatMessages.length]);
+
+  const unreadChatCount = isChatOpen ? 0 : Math.max(0, chatMessages.length - lastReadChatCount);
 
   const me = gameState?.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
+
+  useEffect(() => {
+    if (gameState?.status === 'game_over') {
+      if (gameState.hasPokerBooing) {
+        // Biarkan banner sorakan 'Huuuuuu!' dan kartu di meja kasino terlihat dramatis terlebih dahulu
+        const timer = setTimeout(() => {
+          setShowGameOverModal(true);
+        }, 2200);
+        return () => clearTimeout(timer);
+      } else {
+        setShowGameOverModal(true);
+      }
+    } else {
+      setShowGameOverModal(false);
+    }
+  }, [gameState?.status, gameState?.hasPokerBooing]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -274,16 +359,22 @@ export const App: React.FC = () => {
             onOpenRules={() => setIsRulesOpen(true)}
             errorMessage={errorMessage}
             onClearError={() => setErrorMessage(null)}
+            onResumeControl={handleResumeControl}
+            onDismissBooing={() => setShowGameOverModal(true)}
+            isGameOverModalOpen={showGameOverModal}
+            onToggleChat={handleToggleChat}
+            isChatOpen={isChatOpen}
+            unreadChatCount={unreadChatCount}
           />
 
           <ChatBox
             messages={chatMessages}
             onSendMessage={handleSendMessage}
             isOpen={isChatOpen}
-            onToggleOpen={() => setIsChatOpen(!isChatOpen)}
+            onToggleOpen={handleToggleChat}
           />
 
-          {gameState.status === 'game_over' && (
+          {gameState.status === 'game_over' && showGameOverModal && (
             <GameOverModal
               results={gameState.results}
               winnerId={gameState.winnerId}

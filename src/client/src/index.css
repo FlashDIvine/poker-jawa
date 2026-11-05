@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --breakpoint-xs: 380px;
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
@@ -12,13 +16,13 @@
 
 /* Custom Casino Felt Texture */
 .felt-table {
-  background: radial-gradient(circle at center, #1b4d3e 0%, #0f3026 60%, #071914 100%);
-  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8), 0 20px 50px rgba(0, 0, 0, 0.9);
+  background: radial-gradient(circle at center, #1b4d3e 0%, #0f3026 65%, #081d17 100%);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.7), 0 10px 30px rgba(0, 0, 0, 0.6);
 }
 
 .felt-border {
-  background: linear-gradient(135deg, #4a2c11 0%, #291708 50%, #150b04 100%);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  background: linear-gradient(135deg, #3d220c 0%, #201105 50%, #120903 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
 }
 
 /* Card animations and styling */
@@ -285,6 +289,15 @@
 .slam-delay-3 { animation-delay: 180ms; }
 .slam-delay-4 { animation-delay: 240ms; }
 
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -330,5 +343,68 @@
     padding: 0.4rem !important;
     min-height: 0 !important;
   }
+}
+
+/* Booing ("Huuuuuu!") Animation for players holding Poker card (2) at game end */
+@keyframes booWobble {
+  0% { transform: translateY(-50px) scale(0.6) rotate(0deg); opacity: 0; }
+  25% { transform: translateY(0px) scale(1.08) rotate(-4deg); opacity: 1; }
+  45% { transform: translateY(-8px) scale(0.98) rotate(3deg); }
+  65% { transform: translateY(0px) scale(1.03) rotate(-2deg); }
+  80% { transform: translateY(-3px) scale(1) rotate(1deg); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes booShakeLoop {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-3deg) scale(1.02); }
+  40% { transform: rotate(3deg) scale(0.99); }
+  60% { transform: rotate(-2deg) scale(1.01); }
+  80% { transform: rotate(2deg) scale(1); }
+}
+
+@keyframes booGlowPulse {
+  0%, 100% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.4), inset 0 0 15px rgba(220, 38, 38, 0.3); }
+  50% { box-shadow: 0 0 45px rgba(239, 68, 68, 0.75), inset 0 0 30px rgba(220, 38, 38, 0.6); }
+}
+
+.animate-boo-banner {
+  animation: booWobble 0.65s cubic-bezier(0.18, 0.89, 0.32, 1.28) both, booGlowPulse 1.8s ease-in-out infinite alternate 0.7s;
+}
+
+.animate-boo-shake {
+  animation: booShakeLoop 1.5s ease-in-out infinite;
+}
+
+/* Chat Drawer Slide-in Animation */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Chat Drawer Slide-up Animation for Mobile Portrait */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
