@@ -83,16 +83,53 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   const prevStatusRef = useRef(gameState.status);
   const prevRoundRef = useRef(gameState.roundNumber);
   const hasTriggeredInitialIntroRef = useRef(false);
+  const discardTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const cancelDiscardIntro = () => {
+    discardTimersRef.current.forEach(t => clearTimeout(t));
+    discardTimersRef.current = [];
+    setIsDealing(false);
+    setIsDiscardingThrees(false);
+    setDiscardStep(4);
+  };
+
+  // Immediate abort guard: if cards were played, round finished/waiting, turn time low, or not first turn, cancel any intro immediately
+  useEffect(() => {
+    if (
+      gameState.lastPlay ||
+      !gameState.isFirstTurnOfGame ||
+      gameState.status !== 'playing' ||
+      gameState.turnTimeRemaining <= 5 ||
+      (gameState.trickHistory && gameState.trickHistory.length > 0)
+    ) {
+      cancelDiscardIntro();
+    }
+  }, [
+    gameState.lastPlay,
+    gameState.isFirstTurnOfGame,
+    gameState.status,
+    gameState.turnTimeRemaining,
+    gameState.trickHistory?.length
+  ]);
 
   useEffect(() => {
     const isNewRound = prevRoundRef.current !== gameState.roundNumber;
     const isGameStarted = prevStatusRef.current !== 'playing' && gameState.status === 'playing';
     const isInitialMountPlaying = !hasTriggeredInitialIntroRef.current && gameState.status === 'playing' && gameState.isFirstTurnOfGame && !gameState.lastPlay;
 
-    const timers: any[] = [];
+    prevStatusRef.current = gameState.status;
+    prevRoundRef.current = gameState.roundNumber;
 
-    if (gameState.status === 'playing' && (isGameStarted || isNewRound || isInitialMountPlaying) && !gameState.lastPlay) {
+    if (
+      gameState.status === 'playing' &&
+      (isGameStarted || isNewRound || isInitialMountPlaying) &&
+      !gameState.lastPlay &&
+      gameState.isFirstTurnOfGame &&
+      (!gameState.trickHistory || gameState.trickHistory.length === 0)
+    ) {
       hasTriggeredInitialIntroRef.current = true;
+      cancelDiscardIntro();
+
       setIsDealing(true);
       setIsDiscardingThrees(false);
       setDiscardStep(0);
@@ -112,46 +149,49 @@ export const PokerTable: React.FC<PokerTableProps> = ({
             setDiscardStep(1);
             sounds.playCardSnap();
           }, 1000);
-          timers.push(t1);
+          discardTimersRef.current.push(t1);
 
           // Kartu 2 dibuang ke tengah
           const t2 = setTimeout(() => {
             setDiscardStep(2);
             sounds.playCardSnap();
           }, 1850);
-          timers.push(t2);
+          discardTimersRef.current.push(t2);
 
           // Kartu 3 dibuang ke tengah
           const t3 = setTimeout(() => {
             setDiscardStep(3);
             sounds.playCardSnap();
           }, 2700);
-          timers.push(t3);
+          discardTimersRef.current.push(t3);
 
           // Kartu 4 (3♠ oleh pemegang pertama) dibuang ke tengah
           const t4 = setTimeout(() => {
             setDiscardStep(4);
             sounds.playCardSnap();
           }, 3550);
-          timers.push(t4);
+          discardTimersRef.current.push(t4);
 
           // Selesai intro pembuangan kartu 3
           const tDone = setTimeout(() => {
             setIsDiscardingThrees(false);
           }, 4900);
-          timers.push(tDone);
+          discardTimersRef.current.push(tDone);
         }
       }, 900);
-      timers.push(dealTimer);
+      discardTimersRef.current.push(dealTimer);
     }
 
-    prevStatusRef.current = gameState.status;
-    prevRoundRef.current = gameState.roundNumber;
-
     return () => {
-      timers.forEach(t => clearTimeout(t));
+      cancelDiscardIntro();
     };
-  }, [gameState.status, gameState.roundNumber, gameState.rules?.discardThrees, gameState.isFirstTurnOfGame]);
+  }, [
+    gameState.status,
+    gameState.roundNumber,
+    gameState.rules?.discardThrees,
+    gameState.isFirstTurnOfGame,
+    Boolean(gameState.lastPlay)
+  ]);
 
   // Jika kartu pertama sudah dikeluarkan ke meja oleh pemain/bot setelah intro, update discardStep
   useEffect(() => {
@@ -343,14 +383,14 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   };
 
   return (
-    <div className="w-full min-h-screen landscape:min-h-screen landscape:h-[100dvh] landscape:h-screen flex flex-col justify-between bg-slate-950 text-slate-100 select-none pb-0.5 sm:pb-4 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
+    <div className="w-full min-h-[100dvh] h-[100dvh] flex flex-col justify-between bg-slate-950 text-slate-100 select-none overscroll-y-none pb-0.5 sm:pb-4 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 w-full max-w-6xl mx-auto px-1.5 sm:px-4 py-1 sm:py-2.5 landscape:py-0.5 pt-[max(0.375rem,env(safe-area-inset-top,0px))] flex items-center justify-between shrink-0 z-20 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur-sm">
+      <header className="sticky top-0 w-full max-w-6xl mx-auto px-1.5 sm:px-4 py-1 sm:py-2.5 landscape:py-0.5 pt-[max(0.375rem,env(safe-area-inset-top,0px))] pl-[max(0.375rem,env(safe-area-inset-left,0px))] pr-[max(0.375rem,env(safe-area-inset-right,0px))] flex items-center justify-between shrink-0 z-20 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur-sm">
         {/* Room Info & Code Badge */}
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <button
             onClick={onLeaveRoom}
-            className="p-1.5 sm:p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all cursor-pointer shrink-0"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all cursor-pointer shrink-0"
             title="Tinggalkan Meja"
           >
             <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -363,7 +403,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
               </span>
               <button
                 onClick={handleCopyCode}
-                className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] sm:text-xs font-mono font-bold cursor-pointer transition-all shrink-0"
+                className="min-h-[44px] flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] sm:text-xs font-mono font-bold cursor-pointer transition-all shrink-0"
                 title="Salin Kode Meja"
               >
                 <span>{gameState.roomId}</span>
@@ -387,7 +427,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
           {onToggleChat && (
             <button
               onClick={onToggleChat}
-              className={`relative flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border cursor-pointer transition-all active:scale-95 ${
+              className={`relative min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border cursor-pointer transition-all active:scale-95 ${
                 isChatOpen
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-xs'
                   : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80'
@@ -407,7 +447,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
           {/* Fullscreen Button */}
           <button
             onClick={handleToggleFullscreen}
-            className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 cursor-pointer transition-all"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 cursor-pointer transition-all"
             title={isFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh (Landscape)'}
           >
             {isFullscreen ? <Minimize className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" /> : <Maximize className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300" />}
@@ -415,7 +455,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
 
           <button
             onClick={onOpenRules}
-            className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700/80 cursor-pointer transition-all"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700/80 cursor-pointer transition-all"
             title="Aturan Permainan"
           >
             <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
@@ -424,7 +464,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
 
           <button
             onClick={handleToggleSound}
-            className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 cursor-pointer transition-all"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 cursor-pointer transition-all"
             title="Suara"
           >
             {isMuted ? <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />}
@@ -598,11 +638,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                   isDiscardingThrees={isDiscardingThrees}
                   discardStep={discardStep}
                   discardItems={discardItems}
-                  onSkipIntro={() => {
-                    setIsDealing(false);
-                    setIsDiscardingThrees(false);
-                    setDiscardStep(4);
-                  }}
+                  onSkipIntro={cancelDiscardIntro}
                 />
               )}
             </div>
@@ -681,6 +717,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
               isDealing={isDealing}
               isDiscardingThrees={isDiscardingThrees}
               myHeldThree={me && getPlayerThreeInfo(me.id).card ? (getPlayerThreeInfo(me.id) as { card: Card; isDiscarding: boolean; hasDiscarded: boolean }) : null}
+              onSkipIntro={cancelDiscardIntro}
               rules={gameState.rules}
               player={me}
               turnTimeRemaining={gameState.turnTimeRemaining}

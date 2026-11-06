@@ -52,7 +52,8 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   return (
     <div
       onClick={!disabled ? onClick : undefined}
-      className={`relative select-none bg-gradient-to-b from-white via-slate-50 to-slate-100 border transition-all duration-200 card-shadow ${
+      data-card-id={card.id}
+      className={`relative select-none touch-manipulation bg-gradient-to-b from-white via-slate-50 to-slate-100 border transition-all duration-200 card-shadow ${
         sizeClasses[size]
       } ${
         selected

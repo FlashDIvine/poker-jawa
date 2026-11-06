@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Card, PlayedTrick, GameRules, DEFAULT_RULES, HandCombo, Player } from '@shared/types.js';
 import { PlayingCard } from './PlayingCard.js';
 import { validatePlay, evaluateCombo, canBeat } from '@shared/engine.js';
@@ -23,6 +23,7 @@ interface ActionPanelProps {
   isDealing?: boolean;
   isDiscardingThrees?: boolean;
   myHeldThree?: { card: Card; isDiscarding: boolean; hasDiscarded: boolean } | null;
+  onSkipIntro?: () => void;
   rules?: GameRules;
   player?: Player;
   turnTimeRemaining?: number;
@@ -48,6 +49,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   isDealing = false,
   isDiscardingThrees = false,
   myHeldThree = null,
+  onSkipIntro,
   rules = DEFAULT_RULES,
   player,
   turnTimeRemaining = 15,
@@ -214,9 +216,96 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
     }
   };
 
-  const handleCardClick = (cardId: string) => {
+  // Touch-drag / swipe selection state & trailing click suppression
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const swipeStartCardIdRef = useRef<string | null>(null);
+  const isSwipeMovingRef = useRef(false);
+  const targetModeRef = useRef<'select' | 'deselect'>('select');
+  const swipedCardIdsRef = useRef<Set<string>>(new Set());
+  const currentSwipeSelectionRef = useRef<Set<string>>(new Set());
+  const preventClickUntilRef = useRef<number>(0);
+
+  const handleTouchStartCard = (e: React.TouchEvent, cardId: string) => {
     if (player?.isAutoPlay && onResumeControl) {
       onResumeControl();
+    }
+    if (isDiscardingThrees && onSkipIntro) {
+      onSkipIntro();
+    }
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    swipeStartCardIdRef.current = cardId;
+    isSwipeMovingRef.current = false;
+    const isAlreadySelected = selectedCardIds.includes(cardId);
+    targetModeRef.current = isAlreadySelected ? 'deselect' : 'select';
+    swipedCardIdsRef.current = new Set([cardId]);
+    currentSwipeSelectionRef.current = new Set(selectedCardIds);
+  };
+
+  const handleTouchMoveCards = (e: React.TouchEvent) => {
+    if (!touchStartPosRef.current || !swipeStartCardIdRef.current) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const dx = touch.clientX - touchStartPosRef.current.x;
+    const dy = touch.clientY - touchStartPosRef.current.y;
+    const dist = Math.hypot(dx, dy);
+
+    // If movement passes threshold (8px), activate swipe selection
+    if (!isSwipeMovingRef.current && dist >= 8) {
+      isSwipeMovingRef.current = true;
+      // Apply target mode to the START card first!
+      const startCid = swipeStartCardIdRef.current;
+      if (targetModeRef.current === 'select') {
+        currentSwipeSelectionRef.current.add(startCid);
+      } else {
+        currentSwipeSelectionRef.current.delete(startCid);
+      }
+      onSelectCards(Array.from(currentSwipeSelectionRef.current));
+      sounds.playCardSelect();
+    }
+
+    if (isSwipeMovingRef.current) {
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      const cardContainer = el?.closest('[data-card-id]');
+      if (cardContainer) {
+        const cid = cardContainer.getAttribute('data-card-id');
+        if (cid && !swipedCardIdsRef.current.has(cid)) {
+          swipedCardIdsRef.current.add(cid);
+          if (targetModeRef.current === 'select') {
+            currentSwipeSelectionRef.current.add(cid);
+          } else {
+            currentSwipeSelectionRef.current.delete(cid);
+          }
+          onSelectCards(Array.from(currentSwipeSelectionRef.current));
+          sounds.playCardSelect();
+        }
+      }
+    }
+  };
+
+  const handleTouchEndCards = () => {
+    if (isSwipeMovingRef.current) {
+      onSelectCards(Array.from(currentSwipeSelectionRef.current));
+      preventClickUntilRef.current = Date.now() + 350;
+    }
+    touchStartPosRef.current = null;
+    swipeStartCardIdRef.current = null;
+    isSwipeMovingRef.current = false;
+    swipedCardIdsRef.current.clear();
+  };
+
+  const handleCardClick = (cardId: string) => {
+    if (Date.now() < preventClickUntilRef.current) {
+      return;
+    }
+    if (player?.isAutoPlay && onResumeControl) {
+      onResumeControl();
+    }
+    if (isDiscardingThrees && onSkipIntro) {
+      onSkipIntro();
     }
     sounds.playCardSelect();
     onToggleCard(cardId);
@@ -342,8 +431,11 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           {comboOptions.filter(opt => opt.count > 0).map(opt => (
             <button
               key={opt.type}
-              onClick={() => handleSelectComboType(opt.type)}
-              className="shrink-0 flex items-center gap-1 px-2 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-500/30 hover:border-amber-400"
+              onClick={() => {
+                if (isDiscardingThrees && onSkipIntro) onSkipIntro();
+                handleSelectComboType(opt.type);
+              }}
+              className="shrink-0 flex items-center gap-1 min-h-[40px] sm:min-h-[44px] px-2.5 sm:px-3 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-500/30 hover:border-amber-400"
               title={`Pilih ${opt.label} (${opt.count} tersedia di tangan)`}
             >
               <span>{opt.icon}</span>
@@ -360,7 +452,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {isDiscardingThrees && myHeldThree && myHeldThree.card && !myHeldThree.hasDiscarded && (
         <div className="w-full flex justify-center z-30 mb-0.5">
           <div
-            className={`flex items-center gap-2 px-3 py-1 sm:py-1.5 rounded-2xl bg-slate-900/95 border shadow-2xl backdrop-blur-md transition-all ${
+            onClick={onSkipIntro}
+            className={`flex items-center gap-2 px-3 py-1 sm:py-1.5 rounded-2xl bg-slate-900/95 border shadow-2xl backdrop-blur-md transition-all cursor-pointer ${
               myHeldThree.card.isThreeSpades
                 ? 'border-amber-400 ring-2 ring-amber-400/60 shadow-amber-500/25'
                 : 'border-slate-700'
@@ -369,6 +462,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                 ? 'animate-seat-discard-bottom'
                 : 'animate-badge-pop'
             }`}
+            title="Ketuk untuk lewati intro"
           >
             <div className="shrink-0 shadow-md">
               <PlayingCard card={myHeldThree.card} size="sm" disabled={true} />
@@ -378,7 +472,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                 {myHeldThree.card.isThreeSpades ? '🔥 Anda Memegang 3♠ (Membuka Permainan!)' : `Kartu 3 Anda: 3${myHeldThree.card.suitSymbol}`}
               </span>
               <span className="text-[9px] sm:text-[10px] text-slate-300">
-                {myHeldThree.isDiscarding ? 'Sedang dibuang ke tengah meja...' : 'Akan dibuang satu per satu ke tengah meja'}
+                {myHeldThree.isDiscarding ? 'Sedang dibuang ke tengah meja...' : 'Akan dibuang satu per satu ke tengah meja (Ketuk untuk lewati)'}
               </span>
             </div>
           </div>
@@ -392,6 +486,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             onResumeControl();
           }
         }}
+        onTouchMove={handleTouchMoveCards}
+        onTouchEnd={handleTouchEndCards}
         className="relative w-full overflow-x-auto pt-6 sm:pt-7 landscape:pt-4 pb-1.5 landscape:pb-0.5 px-2 flex justify-start sm:justify-center items-end min-h-[76px] sm:min-h-[105px] landscape:min-h-[64px] landscape:sm:min-h-[68px] scrollbar-thin shrink-0 z-10 isolate"
       >
         <div className={`flex items-end px-2 sm:px-4 ${
@@ -399,7 +495,11 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             ? '-space-x-5.5 xs:-space-x-5 sm:-space-x-4'
             : hand.length > 8
             ? '-space-x-5 xs:-space-x-4 sm:-space-x-4'
-            : '-space-x-4 sm:-space-x-4'
+            : hand.length > 4
+            ? '-space-x-3.5 sm:-space-x-2'
+            : hand.length > 2
+            ? '-space-x-2 sm:space-x-1'
+            : 'space-x-1.5 sm:space-x-2'
         }`}>
           {hand.map((card, idx) => {
             const isSelected = selectedCardIds.includes(card.id);
@@ -409,11 +509,13 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             return (
               <div
                 key={card.id}
+                data-card-id={card.id}
+                onTouchStart={(e) => handleTouchStartCard(e, card.id)}
                 style={{
                   zIndex: cardZIndex,
                   animationDelay: isDealing ? `${idx * 40}ms` : undefined
                 }}
-                className={`transition-all duration-150 ${isDealing ? 'animate-deal-hand' : ''}`}
+                className={`transition-all duration-150 touch-manipulation hover:-translate-y-3 hover:z-30 active:scale-105 active:z-40 ${isDealing ? 'animate-deal-hand' : ''}`}
               >
                 <PlayingCard
                   card={card}
@@ -429,14 +531,14 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
 
       {/* Ergonomic Dedicated Thumb-Friendly Bottom Action Bar */}
-      <div className="relative w-full flex items-center justify-between gap-1 sm:gap-2.5 py-1 sm:py-1.5 px-1.5 sm:px-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] z-30 max-w-4xl shrink-0 bg-slate-900/90 sm:bg-slate-900/50 backdrop-blur-md rounded-t-2xl sm:rounded-2xl border-t border-slate-700/60 sm:border border-slate-700/40 shadow-xl mt-0.5">
+      <div className="relative w-full flex items-center justify-between gap-1 sm:gap-2.5 py-1 sm:py-1.5 px-1.5 sm:px-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] pl-[max(0.375rem,env(safe-area-inset-left,0px))] pr-[max(0.375rem,env(safe-area-inset-right,0px))] z-30 max-w-4xl shrink-0 bg-slate-900/90 sm:bg-slate-900/50 backdrop-blur-md rounded-t-2xl sm:rounded-2xl border-t border-slate-700/60 sm:border border-slate-700/40 shadow-xl mt-0.5">
         {/* Left Thumb Cluster: Pass, Hint, Sort */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Pass Button */}
           <button
             onClick={handlePassClick}
             disabled={!player?.isAutoPlay && !canPass}
-            className={`flex items-center justify-center gap-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl font-bold text-xs sm:text-sm shadow transition-all duration-150 active:scale-95 ${
+            className={`flex items-center justify-center gap-1 min-h-[44px] px-2.5 sm:px-4 py-2 rounded-xl font-bold text-xs sm:text-sm shadow transition-all duration-150 active:scale-95 ${
               player?.isAutoPlay
                 ? 'bg-rose-900/80 hover:bg-rose-800 text-rose-100 border border-rose-500/60 cursor-pointer shadow-rose-950/40 ring-1 ring-rose-500/50'
                 : canPass
@@ -454,7 +556,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
               <button
                 onClick={handleAutoHint}
                 disabled={!player?.isAutoPlay && !isMyTurn}
-                className={`flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl font-semibold text-xs transition-all active:scale-95 ${
+                className={`flex items-center justify-center gap-1 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 py-2 rounded-xl font-semibold text-xs transition-all active:scale-95 ${
                   player?.isAutoPlay || isMyTurn
                     ? 'bg-indigo-900/90 hover:bg-indigo-800 text-indigo-200 border border-indigo-500/50 shadow cursor-pointer ring-1 ring-indigo-400/40'
                     : 'bg-slate-800/60 text-slate-600 border border-slate-800 cursor-not-allowed'
@@ -467,7 +569,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             ) : onToggleHints ? (
               <button
                 onClick={onToggleHints}
-                className="flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-xl font-medium text-xs bg-slate-900 hover:bg-slate-800 text-slate-500 border border-slate-700/80 cursor-pointer transition-all active:scale-95"
+                className="flex items-center justify-center gap-1 min-h-[44px] min-w-[44px] px-2 sm:px-2.5 py-2 rounded-xl font-medium text-xs bg-slate-900 hover:bg-slate-800 text-slate-500 border border-slate-700/80 cursor-pointer transition-all active:scale-95"
                 title="Mode Tanpa Saran aktif. Klik untuk nyalakan bantuan saran."
               >
                 <Lightbulb className="w-3.5 h-3.5 text-slate-600 shrink-0" />
@@ -479,7 +581,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           {/* Sort Button */}
           <button
             onClick={handleSortClick}
-            className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl font-semibold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow cursor-pointer transition-all active:scale-95"
+            className="flex items-center justify-center gap-1 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 py-2 rounded-xl font-semibold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow cursor-pointer transition-all active:scale-95"
             title="Ubah urutan kartu"
           >
             <ArrowUpDown className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -494,7 +596,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           {selectedCardIds.length > 0 && (
             <button
               onClick={handleClearClick}
-              className="flex items-center justify-center p-1.5 sm:p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-all active:scale-95"
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-all active:scale-95"
               title="Batalkan pilihan kartu"
             >
               <X className="w-4 h-4 shrink-0" />
@@ -505,7 +607,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           <button
             onClick={handlePlayClick}
             disabled={isDealing || isDiscardingThrees || (!player?.isAutoPlay && (!isMyTurn || !validation.valid))}
-            className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-1.5 sm:py-2 rounded-xl font-black text-xs sm:text-sm shadow-lg transition-all duration-150 active:scale-95 ${
+            className={`flex items-center justify-center gap-1.5 min-h-[44px] px-2.5 sm:px-5 py-2 rounded-xl font-black text-xs sm:text-sm shadow-lg transition-all duration-150 active:scale-95 ${
               isDealing || isDiscardingThrees
                 ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
                 : player?.isAutoPlay
@@ -518,7 +620,24 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             }`}
           >
             <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-            <span className="truncate max-w-[80px] xs:max-w-[140px] sm:max-w-none">
+            <span
+              title={
+                isDealing
+                  ? 'Membagikan...'
+                  : isDiscardingThrees
+                  ? 'Membuang Kartu 3...'
+                  : player?.isAutoPlay
+                  ? 'Ambil Alih (ON)'
+                  : isPokerSuicideMove
+                  ? 'Keluarkan (⚠️ Kalah Instan!)'
+                  : validation.valid && validation.combo
+                  ? `Keluarkan (${validation.combo.description})`
+                  : selectedCardIds.length > 0
+                  ? `Keluarkan (${selectedCardIds.length})`
+                  : 'Keluarkan'
+              }
+              className="truncate text-[11px] xs:text-xs sm:text-sm max-w-[80px] xs:max-w-[140px] sm:max-w-none"
+            >
               {isDealing
                 ? 'Membagikan...'
                 : isDiscardingThrees

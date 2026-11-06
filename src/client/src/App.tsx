@@ -31,6 +31,7 @@ export const App: React.FC = () => {
   const playerIdRef = useRef<string>('');
   const selfJustPassedRef = useRef<boolean>(false);
   const prevAutoPlayRef = useRef<boolean>(false);
+  const currentRoomIdRef = useRef<string | null>(null);
 
   // Initialize player identity from localStorage
   useEffect(() => {
@@ -68,6 +69,14 @@ export const App: React.FC = () => {
 
     newSocket.on('connect', () => {
       console.log('[Socket] Connected with id:', newSocket.id);
+      if (currentRoomIdRef.current && playerIdRef.current) {
+        newSocket.emit('join_room', {
+          roomId: currentRoomIdRef.current,
+          playerName: localStorage.getItem('poker_remi_player_name') || playerName,
+          avatar: localStorage.getItem('poker_remi_player_avatar') || playerAvatar,
+          playerId: playerIdRef.current
+        });
+      }
     });
 
     newSocket.on('joined_room', (data) => {
@@ -160,6 +169,7 @@ export const App: React.FC = () => {
       }
 
       setGameState(state);
+      currentRoomIdRef.current = state?.roomId || null;
     });
 
     newSocket.on('control_resumed', () => {
@@ -304,6 +314,7 @@ export const App: React.FC = () => {
     if (socket && gameState) {
       socket.emit('leave_room', { roomId: gameState.roomId, playerId });
     }
+    currentRoomIdRef.current = null;
     setGameState(null);
     setChatMessages([]);
     setLastReadChatCount(0);
@@ -348,7 +359,7 @@ export const App: React.FC = () => {
   }, [gameState?.status, gameState?.hasPokerBooing]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-[100dvh] h-[100dvh] bg-slate-950 text-slate-100 flex flex-col font-sans overscroll-y-none">
       {gameState ? (
         <>
           <PokerTable
@@ -387,15 +398,17 @@ export const App: React.FC = () => {
           )}
         </>
       ) : (
-        <Lobby
-          playerName={playerName}
-          onPlayerNameChange={handlePlayerNameChange}
-          playerAvatar={playerAvatar}
-          onPlayerAvatarChange={handlePlayerAvatarChange}
-          onCreateRoom={handleCreateRoom}
-          onJoinRoom={handleJoinRoom}
-          onOpenRules={() => setIsRulesOpen(true)}
-        />
+        <div className="w-full flex-1 overflow-y-auto safe-area-full">
+          <Lobby
+            playerName={playerName}
+            onPlayerNameChange={handlePlayerNameChange}
+            playerAvatar={playerAvatar}
+            onPlayerAvatarChange={handlePlayerAvatarChange}
+            onCreateRoom={handleCreateRoom}
+            onJoinRoom={handleJoinRoom}
+            onOpenRules={() => setIsRulesOpen(true)}
+          />
+        </div>
       )}
 
       {/* Rules Modal */}

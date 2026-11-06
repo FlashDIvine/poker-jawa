@@ -1134,6 +1134,189 @@ describe('UI Layout & Non-Overlapping Elements', () => {
       expect(htmlXs).not.toContain('text-3xl');
     });
   });
+
+  describe('Mobile Ergonomics, Safe Area & Touch Target Hardening', () => {
+    it('verifies index.html has viewport-fit=cover and dynamic 100dvh overscroll-y-none', async () => {
+      const fs = await import('fs');
+      const htmlContent = fs.readFileSync('src/client/index.html', 'utf-8');
+      expect(htmlContent).toContain('viewport-fit=cover');
+      expect(htmlContent).toContain('h-[100dvh]');
+      expect(htmlContent).toContain('overscroll-y-none');
+    });
+
+    it('verifies index.css contains dynamic 100dvh, overscroll-behavior-y none, and safe-area variables', async () => {
+      const fs = await import('fs');
+      const cssContent = fs.readFileSync('src/client/src/index.css', 'utf-8');
+      expect(cssContent).toContain('height: 100dvh;');
+      expect(cssContent).toContain('overscroll-behavior-y: none;');
+      expect(cssContent).toContain('--sat: env(safe-area-inset-top, 0px);');
+      expect(cssContent).toContain('--sab: env(safe-area-inset-bottom, 0px);');
+      expect(cssContent).toContain('--sal: env(safe-area-inset-left, 0px);');
+      expect(cssContent).toContain('--sar: env(safe-area-inset-right, 0px);');
+    });
+
+    it('PokerTable header renders all buttons with min 44px touch hit-box and safe area padding', async () => {
+      const { PokerTable } = await import('../src/client/src/components/PokerTable.js');
+      const html = renderToStaticMarkup(
+        React.createElement(PokerTable, {
+          gameState: sharedMockGameState,
+          myPlayerId: 'me',
+          onPlayCards: () => {},
+          onPassTurn: () => {},
+          onStartGame: () => {},
+          onLeaveRoom: () => {},
+          onOpenRules: () => {},
+          errorMessage: null,
+          onClearError: () => {},
+          onToggleChat: () => {},
+          isChatOpen: false,
+          unreadChatCount: 1
+        })
+      );
+
+      // Root safe area & 100dvh
+      expect(html).toContain('h-[100dvh]');
+      expect(html).toContain('overscroll-y-none');
+      expect(html).toContain('pl-[env(safe-area-inset-left,0px)]');
+      expect(html).toContain('pr-[env(safe-area-inset-right,0px)]');
+
+      // Header safe area left/right
+      expect(html).toContain('pl-[max(0.375rem,env(safe-area-inset-left,0px))]');
+      expect(html).toContain('pr-[max(0.375rem,env(safe-area-inset-right,0px))]');
+
+      // All header buttons touch targets >= 44px
+      expect(html).toContain('min-w-[44px] min-h-[44px]');
+    });
+
+    it('ActionPanel ensures cancel X button, combo chips, and action buttons are touch-friendly (>=44px standard, chips >=40px)', () => {
+      const handWithPair: Card[] = [
+        { id: 'c1', rank: 5, suit: 'S', rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', suitValue: 1, color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+        { id: 'c2', rank: 5, suit: 'H', rankLabel: '5', suitSymbol: '♥', suitName: 'Hati', suitValue: 4, color: 'red', isPoker: false, isAce: false, isThreeSpades: false }
+      ];
+
+      const html = renderToStaticMarkup(
+        React.createElement(ActionPanel, {
+          hand: handWithPair,
+          selectedCardIds: ['c1'],
+          onToggleCard: () => {},
+          onSelectCards: () => {},
+          onClearSelection: () => {},
+          onPlaySelected: () => {},
+          onPass: () => {},
+          onSortToggle: () => {},
+          sortMode: 'rank',
+          isMyTurn: true,
+          lastPlay: null,
+          isFirstTurnOfGame: false
+        })
+      );
+
+      // Cancel X button touch target (>= 44px)
+      expect(html).toContain('min-w-[44px] min-h-[44px]');
+
+      // Combo chip touch target (>= 40px)
+      expect(html).toContain('min-h-[40px]');
+
+      // Action buttons (Pass, Play, Sort) touch target (>= 44px)
+      expect(html).toContain('min-h-[44px]');
+
+      // Auto-scaling text on play button
+      expect(html).toContain('text-[11px] xs:text-xs sm:text-sm');
+
+      // Card swipe touch-manipulation and data-card-id
+      expect(html).toContain('data-card-id="c1"');
+      expect(html).toContain('touch-manipulation');
+
+      // Dynamic spacing: 2 cards in hand uses non-overlapping space-x
+      expect(html).toContain('space-x-1.5');
+    });
+
+    it('ChatBox provides touch-friendly close, input, send and emotes with visualViewport readiness', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(ChatBox, {
+          messages: [{ id: '1', senderId: 'u1', senderName: 'Tester', text: 'Semangat!', timestamp: Date.now(), isSystem: false }],
+          onSendMessage: () => {},
+          isOpen: true,
+          onToggleOpen: () => {}
+        })
+      );
+
+      // Close button touch target >= 44px
+      expect(html).toContain('min-w-[44px] min-h-[44px]');
+      // Quick emotes touch target >= 40px
+      expect(html).toContain('min-h-[40px]');
+      // Input touch target >= 44px
+      expect(html).toContain('min-h-[44px]');
+      // Landscape bottom-anchoring
+      expect(html).toContain('landscape:items-end');
+    });
+
+    it('verifies dynamic hand spacing: large hands overlap smoothly while small hands expand', () => {
+      const largeHand: Card[] = Array.from({ length: 13 }, (_, i) => ({
+        id: `c_${i}`,
+        rank: (i % 13) + 3,
+        suit: 'S',
+        rankLabel: `${(i % 13) + 3}`,
+        suitSymbol: '♠',
+        suitName: 'Waru',
+        suitValue: 1,
+        color: 'black',
+        isPoker: false,
+        isAce: false,
+        isThreeSpades: false
+      }));
+
+      const html = renderToStaticMarkup(
+        React.createElement(ActionPanel, {
+          hand: largeHand,
+          selectedCardIds: [],
+          onToggleCard: () => {},
+          onSelectCards: () => {},
+          onClearSelection: () => {},
+          onPlaySelected: () => {},
+          onPass: () => {},
+          onSortToggle: () => {},
+          sortMode: 'rank',
+          isMyTurn: true,
+          lastPlay: null,
+          isFirstTurnOfGame: false
+        })
+      );
+
+      // Hand with 13 cards uses negative spacing
+      expect(html).toContain('-space-x-5');
+    });
+
+    it('PokerTable copy code button has minimum 44px touch hit-box', async () => {
+      const { PokerTable } = await import('../src/client/src/components/PokerTable.js');
+      const html = renderToStaticMarkup(
+        React.createElement(PokerTable, {
+          gameState: sharedMockGameState,
+          myPlayerId: 'me',
+          onPlayCards: () => {},
+          onPassTurn: () => {},
+          onStartGame: () => {},
+          onLeaveRoom: () => {},
+          onOpenRules: () => {},
+          errorMessage: null,
+          onClearError: () => {},
+          onToggleChat: () => {},
+          isChatOpen: false,
+          unreadChatCount: 0
+        })
+      );
+
+      // Copy room code button >= 44px
+      expect(html).toContain('min-h-[44px]');
+      expect(html).toContain('TEST_RM');
+    });
+
+    it('verifies App.tsx wraps Lobby in an overflow-y-auto safe-area-full container', async () => {
+      const fs = await import('fs');
+      const appContent = fs.readFileSync('src/client/src/App.tsx', 'utf-8');
+      expect(appContent).toContain('w-full flex-1 overflow-y-auto safe-area-full');
+    });
+  });
 });
 
 
