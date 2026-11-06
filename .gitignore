@@ -14,3 +14,9 @@ promo-poker-jawa-3d.mp4
 src/PromoVideo.tsx
 .hyperframes/
 
+# Agent skills & local agent tooling
+.agents/
+.claude/
+agent/
+skills-lock.json
+
