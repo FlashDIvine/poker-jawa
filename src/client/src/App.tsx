@@ -9,6 +9,8 @@ import { ChatBox } from './components/ChatBox.js';
 import { RotateDevicePrompt } from './components/RotateDevicePrompt.js';
 import { sounds } from './audio/soundEffects.js';
 
+export const SERVER_URL = ((import.meta.env.VITE_SERVER_URL as string) || '').replace(/\/$/, '');
+
 export const App: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [playerId, setPlayerId] = useState<string>('');
@@ -60,7 +62,7 @@ export const App: React.FC = () => {
 
   // Setup Socket.IO connection
   useEffect(() => {
-    const newSocket = io('/', {
+    const newSocket = io(SERVER_URL || '/', {
       transports: ['websocket', 'polling']
     });
 
@@ -205,7 +207,7 @@ export const App: React.FC = () => {
   ) => {
     if (!socket) return;
     try {
-      const res = await fetch('/api/rooms', {
+      const res = await fetch(`${SERVER_URL}/api/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomName, fillWithBots, turnTimerSeconds, maxPlayers, rules })

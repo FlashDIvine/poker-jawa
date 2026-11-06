@@ -16,6 +16,8 @@ interface LobbyProps {
 
 const AVATAR_OPTIONS = ['🤠', '🥷', '🧙‍♂️', '🦊', '🐯', '🦁', '🐼', '🐲', '🦅', '🚀', '💎', '👑'];
 
+const SERVER_URL = ((import.meta.env.VITE_SERVER_URL as string) || '').replace(/\/$/, '');
+
 export const Lobby: React.FC<LobbyProps> = ({
   playerName,
   onPlayerNameChange,
@@ -60,7 +62,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const fetchRooms = async () => {
     setLoadingRooms(true);
     try {
-      const res = await fetch('/api/rooms');
+      const res = await fetch(`${SERVER_URL}/api/rooms`);
       if (res.ok) {
         const data = await res.json();
         setPublicRooms(data);
