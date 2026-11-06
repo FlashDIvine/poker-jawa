@@ -658,8 +658,13 @@ export function canBeat(
           return true;
         }
       }
-      if (rules.bombCanCutPoker) {
-        if (challengeCombo.type === 'BONG_FOUR' || challengeCombo.type === 'BONG_SF') {
+      if (rules.bombCanCutPoker || rules.pokerCutByBongLoses) {
+        if (
+          challengeCombo.type === 'BONG_FOUR' ||
+          challengeCombo.type === 'BONG_SF' ||
+          challengeCombo.type === 'STRAIGHT_FLUSH' ||
+          challengeCombo.type === 'ROYAL_FLUSH'
+        ) {
           return true;
         }
       }
@@ -682,7 +687,11 @@ export function canBeat(
 
     // Special Counter / Bomb Rule: In Poker Jawa or when pairAbsoluteRule is disabled,
     // BONG (Four of a Kind or Straight Flush) can cut Pair of 2 ("Poker")
-    if ((!rules.pairAbsoluteRule || rules.preset === 'poker_jawa') && leadCombo.mainRank === 15 && rules.bombCanCutPoker) {
+    if (
+      (!rules.pairAbsoluteRule || rules.preset === 'poker_jawa') &&
+      leadCombo.mainRank === 15 &&
+      (rules.bombCanCutPoker || rules.pokerCutByBongLoses)
+    ) {
       if (
         challengeCombo.type === 'BONG_FOUR' ||
         challengeCombo.type === 'BONG_SF' ||

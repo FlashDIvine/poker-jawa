@@ -734,8 +734,9 @@ export class Room {
 
       let penalty = p.hand.length;
       if (hasPoker) {
-        // Double penalty per poker card held
-        penalty = penalty * Math.pow(2, Math.max(1, pokerCards.length));
+        // Double penalty per poker card held (minimum 5 cards base for instant poker loser even if hand was emptied)
+        const baseCount = isThisInstantLoser ? Math.max(p.hand.length, 5) : p.hand.length;
+        penalty = baseCount * Math.pow(2, Math.max(1, pokerCards.length));
       }
 
       let scoreDelta = 0;

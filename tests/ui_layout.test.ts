@@ -1036,8 +1036,8 @@ describe('UI Layout & Non-Overlapping Elements', () => {
       const fs = await import('fs');
       const css = fs.readFileSync('src/client/src/index.css', 'utf-8');
 
-      // Table width constraints to keep authentic oval casino aspect ratio (approx 2.1:1 - 2.3:1)
-      expect(css).toContain('max-width: min(50vw, 360px) !important;');
+      // Table width constraints to keep authentic oval casino aspect ratio (70% - 80% screen width)
+      expect(css).toContain('max-width: min(78vw, 760px) !important;');
       expect(css).toContain('min-height: 145px !important;');
       expect(css).toContain('max-height: 185px !important;');
       expect(css).toContain('border-radius: 76px !important;');

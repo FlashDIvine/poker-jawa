@@ -57,6 +57,20 @@ describe('Engine & Room Rules: Kena BONG Langsung Mati (pokerCutByBongLoses)', (
       expect(canBeat(pair2, bongFours, POKER_JAWA_RULES)).toBe(true);
       expect(canBeat(pair2, straightFlush5, POKER_JAWA_RULES)).toBe(true);
     });
+
+    it('Pair 2 can be cut by BONG when pairAbsoluteRule is false or under Poker Jawa rules', () => {
+      const customRules = { ...DEFAULT_RULES, pairAbsoluteRule: false, pokerCutByBongLoses: true };
+      const pair2 = evaluateCombo([makeCard(15, 'S'), makeCard(15, 'H')], customRules)!;
+      const bongFours = evaluateCombo([
+        makeCard(9, 'S'), makeCard(9, 'C'), makeCard(9, 'D'), makeCard(9, 'H')
+      ], customRules)!;
+      const bongSF = evaluateCombo([
+        makeCard(5, 'S'), makeCard(6, 'S'), makeCard(7, 'S'), makeCard(8, 'S')
+      ], customRules)!;
+
+      expect(canBeat(pair2, bongFours, customRules)).toBe(true);
+      expect(canBeat(pair2, bongSF, customRules)).toBe(true);
+    });
   });
 
   describe('Room Integration Flow: pokerCutByBongLoses', () => {
@@ -330,6 +344,63 @@ describe('Engine & Room Rules: Kena BONG Langsung Mati (pokerCutByBongLoses)', (
       // Because pokerCutByBongLoses is false, game continues normally
       expect(room.state.status).toBe('playing');
       expect(room.state.lastPlay?.playerId).toBe('pB');
+    });
+
+    it('victim player whose hand is emptied receives negative score delta & double penalty', () => {
+      const mockEmits: Record<string, any[]> = {};
+      const mockIo = createMockIo(mockEmits);
+
+      const room = new Room('RM_TEST5', 'Meja Test 5', mockIo, {
+        maxPlayers: 4,
+        rules: { ...DEFAULT_RULES, pokerCutByBongLoses: true, holdingPokerAsLastCardLoses: false }
+      });
+
+      room.addPlayer('pA', 'Pemain A', '🤠');
+      room.addPlayer('pB', 'Pemain B', '😎');
+      room.addPlayer('pC', 'Pemain C', '🦊');
+      room.addPlayer('pD', 'Pemain D', '🦁');
+
+      room.state.status = 'playing';
+      room.state.isFirstTurnOfGame = false;
+
+      const playerA = room.getPlayer('pA')!;
+      playerA.hand = [makeCard(15, 'H')];
+      playerA.cardCount = 1;
+
+      const playerB = room.getPlayer('pB')!;
+      playerB.hand = [
+        makeCard(10, 'S'), makeCard(10, 'C'), makeCard(10, 'D'), makeCard(10, 'H'),
+        makeCard(6, 'C')
+      ];
+      playerB.cardCount = playerB.hand.length;
+
+      const playerC = room.getPlayer('pC')!;
+      playerC.hand = [makeCard(7, 'S'), makeCard(8, 'S')];
+      playerC.cardCount = playerC.hand.length;
+
+      const playerD = room.getPlayer('pD')!;
+      playerD.hand = [makeCard(9, 'S'), makeCard(9, 'H')];
+      playerD.cardCount = playerD.hand.length;
+
+      room.state.currentTurnPlayerId = 'pA';
+      const playA = room.playCards('pA', ['2H']);
+      expect(playA.success).toBe(true);
+      expect(playerA.hand.length).toBe(0);
+
+      // Player B cuts with Bong
+      room.state.currentTurnPlayerId = 'pB';
+      const playB = room.playCards('pB', ['10S', '10C', '10D', '10H']);
+      expect(playB.success).toBe(true);
+
+      expect(room.state.status).toBe('game_over');
+      expect(playerA.finishRank).toBe(4);
+
+      const resultA = room.state.results?.find(r => r.playerId === 'pA');
+      expect(resultA).toBeDefined();
+      expect(resultA?.rank).toBe(4);
+      expect(resultA?.lostByBongCut).toBe(true);
+      // Victim MUST receive a negative penalty score even if hand length was 0
+      expect(resultA?.scoreDelta).toBeLessThan(0);
     });
   });
 });

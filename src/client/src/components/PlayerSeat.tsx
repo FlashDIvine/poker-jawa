@@ -114,12 +114,18 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
       {/* Name & Bot/Human tag */}
       <div className={`mt-0.5 sm:mt-1 landscape:mt-0.5 flex flex-col items-center text-center ${
-        isSide ? 'max-w-[48px] xs:max-w-[58px] sm:max-w-[110px] landscape:sm:max-w-[60px]' : 'max-w-[65px] xs:max-w-[85px] sm:max-w-[120px] landscape:sm:max-w-[70px]'
+        isSide
+          ? 'max-w-[48px] xs:max-w-[58px] sm:max-w-[110px] landscape:sm:max-w-[60px]'
+          : compact
+          ? 'max-w-[52px] xs:max-w-[64px] sm:max-w-[90px] landscape:max-w-[50px]'
+          : 'max-w-[65px] xs:max-w-[85px] sm:max-w-[120px] landscape:sm:max-w-[70px]'
       }`}>
         <div className="flex items-center gap-0.5 max-w-full justify-center">
           <span className={`font-semibold text-slate-200 truncate ${
             isSide
               ? 'text-[9px] xs:text-[10px] sm:text-xs landscape:text-[9px] max-w-[42px] xs:max-w-[50px] sm:max-w-[90px] landscape:sm:max-w-[54px]'
+              : compact
+              ? 'text-[9px] xs:text-[10px] sm:text-xs landscape:text-[9px] max-w-[44px] xs:max-w-[54px] sm:max-w-[80px] landscape:max-w-[44px]'
               : 'text-[10px] sm:text-sm landscape:text-[10px] max-w-[52px] xs:max-w-[70px] sm:max-w-[100px] landscape:sm:max-w-[64px]'
           }`}>
             {player.name}

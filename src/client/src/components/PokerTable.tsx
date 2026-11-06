@@ -542,7 +542,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
       <main className={`w-full max-w-6xl mx-auto px-1 sm:px-3 flex-1 min-h-0 flex flex-col justify-center my-0 sm:my-1 ${isScreenShaking ? 'animate-screen-shake' : ''}`}>
         {/* Top Seats Exterior (Opponents outside green felt table) - Safe clearance from header */}
         {topOpponents.length > 0 && (
-          <div className="w-full flex justify-center items-center gap-1 sm:gap-3 z-10 flex-wrap pt-2.5 sm:pt-3.5 pb-0.5 landscape:pt-1.5 landscape:pb-0 min-h-[32px] sm:min-h-[48px] shrink-0">
+          <div className="w-full flex justify-center items-center gap-1 sm:gap-3 z-10 flex-wrap landscape:flex-nowrap pt-2.5 sm:pt-3.5 pb-0.5 landscape:pt-1.5 landscape:pb-0 min-h-[32px] sm:min-h-[48px] shrink-0">
             {topOpponents.map(player => {
               const threeInfo = getPlayerThreeInfo(player.id);
               return (
@@ -570,7 +570,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
         <div className="w-full flex items-center justify-between gap-1 sm:gap-2 my-auto landscape:my-0 z-10 px-1 sm:px-2 min-h-0">
           {/* Left Seats Exterior (Opponents) */}
           {leftOpponents.length > 0 ? (
-            <div className={`flex flex-col items-center justify-center gap-1 sm:gap-2 shrink-0 ${isCompact ? 'w-11 xs:w-13 sm:w-20' : 'w-12 xs:w-14 sm:w-24'}`}>
+            <div className={`flex flex-col items-center justify-center gap-1 sm:gap-2 shrink-0 ${isCompact ? 'w-11 xs:w-13 sm:w-20 landscape:w-11 landscape:sm:w-14' : 'w-12 xs:w-14 sm:w-24 landscape:w-12 landscape:sm:w-16'}`}>
               {leftOpponents.map(player => {
                 const threeInfo = getPlayerThreeInfo(player.id);
                 return (
@@ -665,7 +665,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
 
           {/* Right Seats Exterior (Opponents) */}
           {rightOpponents.length > 0 ? (
-            <div className={`flex flex-col items-center justify-center gap-1 sm:gap-2 shrink-0 ${isCompact ? 'w-11 xs:w-13 sm:w-20' : 'w-12 xs:w-14 sm:w-24'}`}>
+            <div className={`flex flex-col items-center justify-center gap-1 sm:gap-2 shrink-0 ${isCompact ? 'w-11 xs:w-13 sm:w-20 landscape:w-11 landscape:sm:w-14' : 'w-12 xs:w-14 sm:w-24 landscape:w-12 landscape:sm:w-16'}`}>
               {rightOpponents.map(player => {
                 const threeInfo = getPlayerThreeInfo(player.id);
                 return (

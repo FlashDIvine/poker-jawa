@@ -577,7 +577,9 @@
   .felt-border-mobile-landscape {
     border-radius: 76px !important;
     padding: 3px !important;
-    max-width: min(50vw, 360px) !important;
+    width: 76% !important;
+    max-width: min(78vw, 760px) !important;
+    min-width: min(70vw, 480px) !important;
     flex-shrink: 0 !important;
   }
 
@@ -586,6 +588,7 @@
     padding: 0.35rem 0.6rem !important;
     min-height: 145px !important;
     max-height: 185px !important;
+    width: 100% !important;
   }
 
   .card-selected {
