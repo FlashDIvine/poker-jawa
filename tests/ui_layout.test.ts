@@ -826,7 +826,7 @@ describe('UI Layout & Non-Overlapping Elements', () => {
         cards: [{ id: '8S', rank: 8, suit: 'S' as const, suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black' as const, isPoker: false, isAce: false, isThreeSpades: false }],
         playerId: 'p1',
         playerName: 'FastStarter',
-        combo: { type: 'SINGLE' as const, mainRank: 8, description: 'Satuan 8♠', cards: [{ id: '8S', rank: 8, suit: 'S' as const, suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black' as const, isPoker: false, isAce: false, isThreeSpades: false }] },
+        combo: { type: 'SINGLE' as const, mainRank: 8, highestSuitValue: 1, description: 'Satuan 8♠', cards: [{ id: '8S', rank: 8, suit: 'S' as const, suitValue: 1, rankLabel: '8', suitSymbol: '♠', suitName: 'Waru', color: 'black' as const, isPoker: false, isAce: false, isThreeSpades: false }] },
         timestamp: Date.now()
       };
 

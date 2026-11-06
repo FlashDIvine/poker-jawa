@@ -330,7 +330,7 @@ export const CreateRoomForm: React.FC<{
                   onChange={(e) => updateRuleField('cutTwoWithTrisOrFH', e.target.checked)}
                   className="accent-amber-500 cursor-pointer"
                 />
-                <span>Patah 2 (Kartu 2 / Poker satuan bisa dipatahkan Tris / Full House)</span>
+                <span>Patah 2 (Opsional: Izinkan Tris / Full House kalahkan kartu 2)</span>
               </label>
 
               <label className="flex items-center gap-1.5 cursor-pointer">

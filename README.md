@@ -14,7 +14,7 @@ Permainan kartu Web Multiplayer Real-time berbasis varian khas **Poker Jawa / Ca
    - **Hierarki Kembang (Suit)**: `♠ Waru/Sekop (1) < ♣ Keriting (2) < ♦ Wajik (3) < ♥ Hati (4)`.
    - **Aturan Mutlak Pair (2 Kartu Kembar)**: Meja Pair **HANYA boleh dilawan dengan Pair juga** yang angkanya lebih tinggi! Pair tidak bisa ditabrak/dipatahkan oleh Tris, Full House, atau Bong.
    - **Mekanik Patah & Bom Khusus**:
-     - Kartu **Satuan 2 ("Poker")** adalah kartu tunggal tertinggi, namun dapat dipatahkan/di-bom oleh: **Tris** (kembar 3), **Full House**, atau **"Bong"** (Four of a Kind atau 4-card Straight Flush).
+     - Kartu **Satuan 2 ("Poker")** adalah kartu tunggal tertinggi dan **TIDAK BISA** dikalahkan oleh Tris! Kartu 2 hanya bisa dipatahkan/di-bom oleh **"Bong"** (Four of a Kind atau 4-card Straight Flush).
      - Kartu **Satuan As** dapat dipatahkan oleh: Poker (2), **Tris** (kembar 3), atau **Full House**!
      - **Bong Straight Flush** mengalahkan **Bong Four of a Kind**.
      - **Full House** adalah satu-satunya kombinasi 5-kartu sah (diadu berdasarkan nilai Tris-nya).

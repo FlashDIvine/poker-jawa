@@ -6,3 +6,11 @@ dist/
 .env.*
 .vscode/
 
+# Promo video assets & scratch
+promo-video/
+promo-video-3d/
+promo-poker-jawa.mp4
+promo-poker-jawa-3d.mp4
+src/PromoVideo.tsx
+.hyperframes/
+

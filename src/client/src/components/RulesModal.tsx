@@ -123,9 +123,9 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                   </div>
 
                   <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800">
-                    <strong className="text-amber-400">Patah & Bom Kartu Satuan Poker (2):</strong>
+                    <strong className="text-amber-400">Bom Kartu Satuan Poker (2):</strong>
                     <p className="text-xs text-slate-300 mt-0.5">
-                      Kartu Satuan 2 (&quot;Poker&quot;) dapat dipatahkan/di-bom oleh <strong className="text-emerald-400">Tris (kembar 3)</strong>, <strong className="text-purple-400">Full House</strong>, atau <strong className="text-rose-400">&quot;Bong&quot;</strong> (Four of a Kind atau Straight Flush 4 kartu)!
+                      Kartu Satuan 2 (&quot;Poker&quot;) adalah kartu tunggal tertinggi dan <strong className="text-yellow-300">TIDAK BISA</strong> dikalahkan oleh Tris! Kartu 2 hanya bisa dipatahkan/di-bom oleh <strong className="text-rose-400">&quot;Bong&quot;</strong> (Four of a Kind atau Straight Flush 4 kartu)!
                     </p>
                   </div>
                 </div>

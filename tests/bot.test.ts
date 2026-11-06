@@ -144,7 +144,7 @@ describe('Bot logic', () => {
     expect(evaluated?.type).toBe('BONG_FOUR');
   });
 
-  it('counters Poker (2) with Tris when holding Tris without Bong', () => {
+  it('does NOT counter Poker (2) with Tris by default (passes), but counters if cutTwoWithTrisOrFH is enabled', () => {
     const hand = [
       makeCard(7, 'S'), makeCard(7, 'C'), makeCard(7, 'D'),
       makeCard(4, 'S')
@@ -157,9 +157,14 @@ describe('Bot logic', () => {
       timestamp: Date.now()
     };
 
-    const response = decideBotMove(hand, leadPoker, false);
-    expect(response).not.toBeNull();
-    const evaluated = evaluateCombo(response!);
+    // Default rules: 2 cannot be beaten by Tris -> bot must pass (return null)
+    const responseDefault = decideBotMove(hand, leadPoker, false);
+    expect(responseDefault).toBeNull();
+
+    // Custom rules with cutTwoWithTrisOrFH: true -> bot counters with Tris
+    const responseCustom = decideBotMove(hand, leadPoker, false, { ...DEFAULT_RULES, cutTwoWithTrisOrFH: true });
+    expect(responseCustom).not.toBeNull();
+    const evaluated = evaluateCombo(responseCustom!);
     expect(evaluated?.type).toBe('TRIS');
   });
 

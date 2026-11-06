@@ -64,7 +64,7 @@ export interface GameRules {
   pairAbsoluteRule: boolean;            // Aturan Mutlak Pair: Pair HANYA boleh dilawan sesama Pair
   bombCanCutPoker: boolean;             // Bom (4-of-a-kind, Flush, RSF, Bong) potong kartu 2 ("Poker")
   cutAceWithTrisOrFH: boolean;          // Patah As dengan Tris atau Full House (aturan default Remi)
-  cutTwoWithTrisOrFH: boolean;          // Patah 2 dengan Tris atau Full House (aturan default Remi)
+  cutTwoWithTrisOrFH: boolean;          // Patah 2 dengan Tris atau Full House (opsional/kustom; default false: kartu 2 tidak bisa dikalahkan Tris)
   openingCard: '3S' | '3D' | 'any_3';   // Kartu pembuka: 3 Waru (3♠) / 3 Wajik (3♦) / bebas angka 3
   deckCount: 1;                         // Strictly 1 dek (52 kartu) selalu
   discardThrees?: boolean;              // Di awal game semua angka 3 dibuang dan pemegang 3 Waru (3♠) jalan duluan
@@ -90,7 +90,7 @@ export const DEFAULT_RULES: GameRules = {
   pairAbsoluteRule: true,
   bombCanCutPoker: true,
   cutAceWithTrisOrFH: true,
-  cutTwoWithTrisOrFH: true,
+  cutTwoWithTrisOrFH: false,
   openingCard: '3S',
   deckCount: 1,
   discardThrees: true,

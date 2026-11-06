@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateCombo, canBeat, validatePlay } from '../src/shared/engine.js';
-import { Card, DEFAULT_RULES } from '../src/shared/types.js';
+import { Card, DEFAULT_RULES, POKER_JAWA_RULES } from '../src/shared/types.js';
 
 function makeCard(rank: number, suit: 'S' | 'C' | 'D' | 'H'): Card {
   const suitMap = {
@@ -173,7 +173,7 @@ describe('Engine - canBeat rules', () => {
     expect(canBeat(kingHearts, fullHouseFours)).toBe(false);
   });
 
-  it('Poker counter rules: Poker (2) can be bombed by Bong (4 of a Kind or Straight Flush)', () => {
+  it('Poker counter rules: Poker (2) can be bombed by Bong, but CANNOT be beaten by Tris or Full House by default', () => {
     const pokerHearts = evaluateCombo([makeCard(15, 'H')])!;
     const bongFours = evaluateCombo([
       makeCard(6, 'S'), makeCard(6, 'C'), makeCard(6, 'D'), makeCard(6, 'H')
@@ -185,14 +185,24 @@ describe('Engine - canBeat rules', () => {
     expect(canBeat(pokerHearts, bongFours)).toBe(true);
     expect(canBeat(pokerHearts, bongSF)).toBe(true);
 
-    // Poker (2) can also be countered by Tris (kembar 3) or Full House!
+    // Kartu 2 TIDAK BISA dikalahkan oleh Tris (kembar 3) atau Full House secara default!
     const trisSevens = evaluateCombo([makeCard(7, 'S'), makeCard(7, 'C'), makeCard(7, 'D')])!;
     const fullHouseThrees = evaluateCombo([
       makeCard(3, 'S'), makeCard(3, 'C'), makeCard(3, 'D'),
       makeCard(4, 'S'), makeCard(4, 'C')
     ])!;
-    expect(canBeat(pokerHearts, trisSevens)).toBe(true);
-    expect(canBeat(pokerHearts, fullHouseThrees)).toBe(true);
+    expect(canBeat(pokerHearts, trisSevens)).toBe(false);
+    expect(canBeat(pokerHearts, fullHouseThrees)).toBe(false);
+
+    // Di POKER_JAWA_RULES juga mutlak tidak bisa dikalahkan Tris / Full House!
+    expect(canBeat(pokerHearts, trisSevens, POKER_JAWA_RULES)).toBe(false);
+    expect(canBeat(pokerHearts, fullHouseThrees, POKER_JAWA_RULES)).toBe(false);
+    expect(canBeat(pokerHearts, bongFours, POKER_JAWA_RULES)).toBe(true);
+
+    // Namun bila opsi custom cutTwoWithTrisOrFH diaktifkan, barulah Tris / Full House bisa mematahkan 2
+    const customCutTwoRules = { ...DEFAULT_RULES, cutTwoWithTrisOrFH: true };
+    expect(canBeat(pokerHearts, trisSevens, customCutTwoRules)).toBe(true);
+    expect(canBeat(pokerHearts, fullHouseThrees, customCutTwoRules)).toBe(true);
 
     // Aturan Mutlak Pair: Pair (2 kartu kembar) HANYA boleh ditabrak oleh Pair juga!
     const pairPoker = evaluateCombo([makeCard(15, 'S'), makeCard(15, 'H')])!;
