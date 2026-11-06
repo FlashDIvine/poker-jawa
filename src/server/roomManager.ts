@@ -38,6 +38,7 @@ export class Room {
       deckCount: 1,
       discardThrees: true,
       holdingPokerAsLastCardLoses: true,
+      pokerCutByBongLoses: true,
       ...(options?.rules || {})
     };
     this.rules.deckCount = 1;
@@ -62,7 +63,8 @@ export class Room {
       winnerId: null,
       results: null,
       hasPokerBooing: false,
-      pokerLoserNames: []
+      pokerLoserNames: [],
+      bongLossInfo: null
     };
   }
 
@@ -243,6 +245,7 @@ export class Room {
     this.state.results = null;
     this.state.hasPokerBooing = false;
     this.state.pokerLoserNames = [];
+    this.state.bongLossInfo = null;
 
     const starterCardName = (this.rules.discardThrees !== false || this.rules.openingCard === '3S')
       ? '3 Waru (3♠)'
@@ -294,6 +297,27 @@ export class Room {
     player.hand = player.hand.filter(c => !playedSet.has(c.id));
     player.cardCount = player.hand.length;
 
+    const previousPlay = this.state.lastPlay;
+    const isLeadPlayPoker =
+      Boolean(previousPlay) &&
+      (previousPlay!.combo.type === 'SINGLE' || previousPlay!.combo.type === 'PAIR') &&
+      previousPlay!.combo.mainRank === 15;
+
+    const isCurrentPlayBong =
+      validation.combo.type === 'BONG_FOUR' ||
+      validation.combo.type === 'BONG_SF' ||
+      validation.combo.type === 'STRAIGHT_FLUSH' ||
+      validation.combo.type === 'ROYAL_FLUSH';
+
+    const isCutByOtherPlayer =
+      Boolean(previousPlay) && previousPlay!.playerId !== player.id;
+
+    const isBongInstantLoss =
+      this.rules.pokerCutByBongLoses !== false &&
+      isLeadPlayPoker &&
+      isCurrentPlayBong &&
+      isCutByOtherPlayer;
+
     const playedTrick: PlayedTrick = {
       playerId: player.id,
       playerName: player.name,
@@ -307,6 +331,36 @@ export class Room {
     this.state.leadPlayerId = player.id;
     this.state.consecutivePasses = 0; // Reset consecutive pass counter setiap kali kartu baru dikeluarkan
     this.state.players.forEach(p => (p.passed = false)); // Reset status lewat: saat giliran berputar, pemain lain masih bisa jalan lagi
+
+    // Sesuai aturan tongkrongan: Pemain buang kartu 2 (Satuan/Pair) lalu dipotong BONG langsung KALAH TELAK seketika!
+    if (isBongInstantLoss && previousPlay) {
+      const victimPlayerId = previousPlay.playerId;
+      const victimPlayer = this.getPlayer(victimPlayerId);
+
+      // If bomber finished all their cards with this BONG move, record them as finisher
+      if (player.hand.length === 0 && !this.finishers.includes(player.id)) {
+        this.finishers.push(player.id);
+      }
+
+      const bongLossData = {
+        victimPlayerId,
+        victimName: victimPlayer?.name || previousPlay.playerName,
+        bomberPlayerId: player.id,
+        bomberName: player.name,
+        bongType: validation.combo.type,
+        bongDescription: validation.combo.description
+      };
+
+      this.state.bongLossInfo = bongLossData;
+      this.io.to(this.id).emit('poker_bong_instant_loss', bongLossData);
+
+      this.broadcastSystemChat(
+        `💥💣 HUUUUUU! ${victimPlayer?.name || previousPlay.playerName} Kena BONG (${validation.combo.description}) oleh ${player.name}! Langsung Modar / Kalah Telak! 💀`
+      );
+
+      this.handleGameOver(victimPlayerId, player.id);
+      return { success: true };
+    }
 
     // Check if THIS player just ran out of cards!
     if (player.hand.length === 0 && !player.finishRank) {
@@ -577,7 +631,7 @@ export class Room {
     }
   }
 
-  private handleGameOver(instantPokerLoserId?: string): void {
+  private handleGameOver(instantPokerLoserId?: string, bomberPlayerId?: string): void {
     if (this.turnInterval) {
       clearInterval(this.turnInterval);
       this.turnInterval = null;
@@ -588,9 +642,15 @@ export class Room {
     }
 
     // 1. Pemain yang sudah berhasil menghabiskan seluruh kartunya sebelum game over
-    const finishedPlayers = this.finishers
-      .map(id => this.getPlayer(id))
-      .filter((p): p is Player => p !== undefined && p.hand.length === 0);
+    const finishedPlayers = this.state.players.filter(p => p.hand.length === 0 && p.id !== instantPokerLoserId);
+    finishedPlayers.sort((a, b) => {
+      const idxA = this.finishers.indexOf(a.id);
+      const idxB = this.finishers.indexOf(b.id);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return 0;
+    });
 
     // 2. Pemain yang masih memegang sisa kartu saat permainan berakhir
     const remainingPlayers = this.state.players.filter(p => p.hand.length > 0);
@@ -602,11 +662,19 @@ export class Room {
     const isInstantPokerLoss = Boolean(instantPokerLoserId);
 
     if (isInstantPokerLoss && instantPokerLoserId) {
-      // Saat kalah instan kartu 2: Hanya pemain yang melanggar yang menjadi pecundang kartu poker!
-      // Seluruh pemain lain ("yang lain langsung menang") diurutkan berdasarkan sisa kartu paling sedikit ke terbanyak.
+      // Saat kalah instan kartu 2 (kartu terakhir atau kena BONG):
+      // Hanya pemain yang melanggar yang menjadi pecundang kartu poker!
+      // Seluruh pemain lain diurutkan berdasarkan sisa kartu, dengan bomber diprioritaskan sebagai pemenang.
       const instantLoser = this.getPlayer(instantPokerLoserId);
       const otherRemaining = remainingPlayers.filter(p => p.id !== instantPokerLoserId);
-      otherRemaining.sort((a, b) => a.hand.length - b.hand.length);
+
+      otherRemaining.sort((a, b) => {
+        if (bomberPlayerId) {
+          if (a.id === bomberPlayerId) return -1;
+          if (b.id === bomberPlayerId) return 1;
+        }
+        return a.hand.length - b.hand.length;
+      });
 
       finalOrder = [
         ...finishedPlayers,
@@ -673,14 +741,14 @@ export class Room {
       let scoreDelta = 0;
       if (rank === 1) {
         scoreDelta = 30;
-      } else if (rank === 2 && p.hand.length === 0) {
+      } else if (rank === 2 && (p.hand.length === 0 || (isInstantPokerLoss && totalPlayers >= 4))) {
         scoreDelta = totalPlayers >= 4 ? 10 : 0;
       } else if (hasPoker) {
         scoreDelta = -penalty;
       } else if (isInstantPokerLoss) {
-        // Jika game berakhir seketika karena pemain lawan memegang kartu 2 sebagai kartu terakhir,
+        // Jika game berakhir seketika karena pemain lawan memegang kartu 2 sebagai kartu terakhir atau kena BONG,
         // seluruh pemain lain menang tanpa penalti minus!
-        scoreDelta = rank === 2 && totalPlayers >= 4 ? 10 : 0;
+        scoreDelta = 0;
       } else {
         scoreDelta = -penalty;
       }
@@ -697,7 +765,9 @@ export class Room {
         scoreDelta,
         isWinner: rank === 1,
         caughtHoldingPoker: hasPoker,
-        pokerCardsCount: hasPoker ? Math.max(1, pokerCards.length) : 0
+        pokerCardsCount: hasPoker ? Math.max(1, pokerCards.length) : 0,
+        lostByBongCut: Boolean(isThisInstantLoser && bomberPlayerId),
+        bombedByPlayerId: isThisInstantLoser && bomberPlayerId ? bomberPlayerId : undefined
       };
     });
 
@@ -819,6 +889,7 @@ export class Room {
     this.state.results = null;
     this.state.hasPokerBooing = false;
     this.state.pokerLoserNames = [];
+    this.state.bongLossInfo = null;
     this.finishers = [];
     this.state.finishers = [];
     this.state.players.forEach(p => {

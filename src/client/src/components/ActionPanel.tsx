@@ -530,8 +530,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       </div>
 
 
-      {/* Ergonomic Dedicated Thumb-Friendly Bottom Action Bar */}
-      <div className="relative w-full flex items-center justify-between gap-1 sm:gap-2.5 py-1 sm:py-1.5 px-1.5 sm:px-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] pl-[max(0.375rem,env(safe-area-inset-left,0px))] pr-[max(0.375rem,env(safe-area-inset-right,0px))] z-30 max-w-4xl shrink-0 bg-slate-900/90 sm:bg-slate-900/50 backdrop-blur-md rounded-t-2xl sm:rounded-2xl border-t border-slate-700/60 sm:border border-slate-700/40 shadow-xl mt-0.5">
+      {/* Ergonomic Dedicated Floating Action Bar (Transparent HUD Floating Hand) */}
+      <div className="relative w-full flex items-center justify-between gap-1 sm:gap-2.5 py-1 sm:py-1.5 px-1.5 sm:px-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] pl-[max(0.375rem,env(safe-area-inset-left,0px))] pr-[max(0.375rem,env(safe-area-inset-right,0px))] z-30 max-w-4xl shrink-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent sm:bg-slate-900/40 backdrop-blur-xs rounded-t-2xl sm:rounded-2xl border-t border-slate-700/60 sm:border border-slate-700/40 shadow-xl mt-0.5">
         {/* Left Thumb Cluster: Pass, Hint, Sort */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Pass Button */}

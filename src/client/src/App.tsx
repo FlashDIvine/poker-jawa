@@ -83,6 +83,11 @@ export const App: React.FC = () => {
       console.log('[Socket] Joined room:', data);
     });
 
+    newSocket.on('poker_bong_instant_loss', (data) => {
+      console.log('[Socket] BONG instant loss triggered:', data);
+      sounds.playBongExplosion();
+    });
+
     newSocket.on('game_state', (state: GameState) => {
       // Audio trigger on dealing
       if (prevStatusRef.current !== 'playing' && state.status === 'playing') {
@@ -91,7 +96,12 @@ export const App: React.FC = () => {
 
       // Audio trigger on game over
       if (prevStatusRef.current === 'playing' && state.status === 'game_over') {
-        if (state.hasPokerBooing || state.results?.some(r => r.caughtHoldingPoker)) {
+        if (state.bongLossInfo) {
+          sounds.playBongExplosion();
+          setTimeout(() => {
+            sounds.playWinFanfare();
+          }, 2000);
+        } else if (state.hasPokerBooing || state.results?.some(r => r.caughtHoldingPoker)) {
           sounds.playBooingSound();
           setTimeout(() => {
             sounds.playWinFanfare();
@@ -344,7 +354,13 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (gameState?.status === 'game_over') {
-      if (gameState.hasPokerBooing) {
+      if (gameState.bongLossInfo) {
+        // Biarkan banner ledakan BONG dan kartu di meja kasino terlihat dramatis terlebih dahulu
+        const timer = setTimeout(() => {
+          setShowGameOverModal(true);
+        }, 3000);
+        return () => clearTimeout(timer);
+      } else if (gameState.hasPokerBooing) {
         // Biarkan banner sorakan 'Huuuuuu!' dan kartu di meja kasino terlihat dramatis terlebih dahulu
         const timer = setTimeout(() => {
           setShowGameOverModal(true);
@@ -356,7 +372,7 @@ export const App: React.FC = () => {
     } else {
       setShowGameOverModal(false);
     }
-  }, [gameState?.status, gameState?.hasPokerBooing]);
+  }, [gameState?.status, gameState?.hasPokerBooing, gameState?.bongLossInfo]);
 
   return (
     <div className="min-h-[100dvh] h-[100dvh] bg-slate-950 text-slate-100 flex flex-col font-sans overscroll-y-none">

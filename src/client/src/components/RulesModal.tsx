@@ -141,6 +141,17 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                   Pemain <strong className="text-rose-300">dilarang keras memegang kartu 2 (Poker) sebagai kartu terakhir</strong> di tangan, serta dilarang menutup/memenangkan permainan menggunakan kartu 2. Apabila seorang pemain hanya menyisakan kartu 2 di tangannya, pemain tersebut <strong className="text-yellow-300">LANGSUNG DINYATAKAN KALAH TELAK (Kena Booing)</strong> dan seluruh pemain lawan <strong className="text-emerald-300">LANGSUNG MENANG</strong>!
                 </p>
               </div>
+
+              {/* Default Rule 6: Kena BONG Langsung Mati */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/60 via-red-950/40 to-slate-800/60 border border-rose-500/50">
+                <div className="flex items-center gap-2 font-bold text-amber-300 text-base mb-1">
+                  <span>💣</span>
+                  <span>6. Kena BONG Langsung Mati (Aturan Tongkrongan)</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Jika seorang pemain mengeluarkan <strong className="text-amber-300">kartu 2 (Poker)</strong> — baik Satuan 2 maupun Pair 2 — lalu pemain lain <strong className="text-rose-400">memotongnya dengan BONG</strong> (Four of a Kind atau Straight Flush), pemain pemegang kartu 2 tersebut <strong className="text-yellow-300">LANGSUNG MATI / KALAH INSTAN</strong> seketika! Ronde langsung berakhir, pemain tersebut menjadi juru kunci dengan penalti denda minus lipat ganda!
+                </p>
+              </div>
             </>
           ) : (
             <>
@@ -231,6 +242,17 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
                   Pemain dilarang memegang kartu 2 sebagai kartu terakhir di tangan. Jika hanya tersisa kartu 2 di tangan pemain, pemain tersebut <strong className="text-yellow-300">LANGSUNG KALAH TELAK</strong> dan pemain lain langsung menang!
+                </p>
+              </div>
+
+              {/* Poker Jawa Rule 7: Kena BONG Langsung Mati */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/60 via-red-950/40 to-slate-800/60 border border-rose-500/50">
+                <div className="flex items-center gap-2 font-bold text-amber-300 text-base mb-1">
+                  <span>💣</span>
+                  <span>7. Kena BONG Langsung Mati (Aturan Tongkrongan)</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Jika mengeluarkan kartu 2 (Satuan 2 atau Pair 2) lalu dipotong oleh BONG (Four of a Kind atau Straight Flush), pemain tersebut <strong className="text-yellow-300">LANGSUNG MATI / KALAH TELAK</strong> seketika! Ronde selesai seketika dan penalti minus lipat ganda!
                 </p>
               </div>
             </>

@@ -76,23 +76,39 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             )}
           </p>
 
-        {/* Booing ("Huuuuuu!") Notice Banner if players held Poker cards */}
+        {/* Booing ("Huuuuuu!") / BONG Loss Notice Banner */}
         {pokerLosers.length > 0 && (
           <div className="w-full mt-2.5 sm:mt-3 landscape:mt-1.5 bg-gradient-to-r from-red-950/90 via-rose-900/90 to-red-950/90 border-2 border-red-500/80 rounded-2xl p-2.5 sm:p-3 landscape:p-2 text-center shadow-lg shadow-red-900/40 animate-boo-banner shrink-0">
             <div className="flex items-center justify-center gap-2 text-red-200 font-black text-xs sm:text-base">
-              <span className="text-base sm:text-lg">👎</span>
-              <span className="text-amber-300 tracking-wider">HUUUUUU! KENA BOOING!</span>
-              <span className="text-base sm:text-lg">👎</span>
+              <span className="text-base sm:text-lg">{pokerLosers.some(p => p.lostByBongCut) ? '💣' : '👎'}</span>
+              <span className="text-amber-300 tracking-wider">
+                {pokerLosers.some(p => p.lostByBongCut) ? 'HUUUUUU! KENA BONG! MODAR!' : 'HUUUUUU! KENA BOOING!'}
+              </span>
+              <span className="text-base sm:text-lg">{pokerLosers.some(p => p.lostByBongCut) ? '💣' : '👎'}</span>
             </div>
             <p className="text-[11px] sm:text-xs text-rose-100 mt-0.5 font-medium">
-              <strong className="text-yellow-300">{pokerLosers.map(p => p.playerName).join(', ')}</strong> masih memegang <span className="bg-red-800 text-amber-200 px-1 py-0.5 rounded font-bold font-mono">Kartu Poker (2)</span> di akhir game sehingga langsung kalah telak!
+              {pokerLosers.some(p => p.lostByBongCut) ? (
+                <>
+                  <strong className="text-yellow-300">{pokerLosers.map(p => p.playerName).join(', ')}</strong> kena BONG saat mengeluarkan kartu 2 dan <span className="text-yellow-300 font-bold">LANGSUNG KALAH TELAK / MODAR</span>!
+                </>
+              ) : (
+                <>
+                  <strong className="text-yellow-300">{pokerLosers.map(p => p.playerName).join(', ')}</strong> masih memegang <span className="bg-red-800 text-amber-200 px-1 py-0.5 rounded font-bold font-mono">Kartu Poker (2)</span> di akhir game sehingga langsung kalah telak!
+                </>
+              )}
             </p>
             <button
-              onClick={() => sounds.playBooingSound()}
+              onClick={() => {
+                if (pokerLosers.some(p => p.lostByBongCut)) {
+                  sounds.playBongExplosion();
+                } else {
+                  sounds.playBooingSound();
+                }
+              }}
               className="mt-1.5 sm:mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-red-600 hover:bg-red-500 text-white text-[11px] sm:text-xs font-bold shadow transition-all active:scale-95 cursor-pointer"
             >
               <span>🔊</span>
-              <span>Soraki Huuuuuu Lagi!</span>
+              <span>{pokerLosers.some(p => p.lostByBongCut) ? 'Ledakkan Huu Lagi!' : 'Soraki Huuuuuu Lagi!'}</span>
             </button>
           </div>
         )}
@@ -136,12 +152,17 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                         BOT
                       </span>
                     )}
-                    {isBooed && (
+                    {res.lostByBongCut ? (
+                      <span className="text-[9px] sm:text-[10px] bg-rose-700 text-white border border-rose-300 px-2 py-0.5 rounded-full font-black animate-bounce flex items-center gap-1 shadow-sm shrink-0">
+                        <span>💣</span>
+                        <span>MODAR KENA BONG!</span>
+                      </span>
+                    ) : isBooed ? (
                       <span className="text-[9px] sm:text-[10px] bg-red-600/90 text-white border border-red-400/80 px-2 py-0.5 rounded-full font-black animate-pulse flex items-center gap-1 shadow-sm shrink-0">
                         <span>👎</span>
                         <span>{res.pokerCardsCount && res.pokerCardsCount > 1 ? `HUUU! (${res.pokerCardsCount}x Kartu 2)` : 'HUUU! (Kartu 2)'}</span>
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 

@@ -228,6 +228,61 @@ class SoundManager {
     crackOsc.stop(now + 0.09);
   }
 
+  // Dramatic Massive BONG Explosion sound (Sub-bass rumble + fiery shockwave + crowd Huuu)
+  public playBongExplosion(): void {
+    if (!this.enabled) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+
+    // 1. Seismic sub-bass sweep (340Hz down to 25Hz)
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sawtooth';
+    subOsc.frequency.setValueAtTime(340, now);
+    subOsc.frequency.exponentialRampToValueAtTime(25, now + 0.6);
+
+    subGain.gain.setValueAtTime(0.75, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+    subOsc.connect(subGain);
+    subGain.connect(this.ctx.destination);
+    subOsc.start(now);
+    subOsc.stop(now + 0.6);
+
+    // 2. Heavy explosive noise crack & rumble
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.45);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1400, now);
+    filter.frequency.exponentialRampToValueAtTime(110, now + 0.45);
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.65, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+    whiteNoise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.ctx.destination);
+    whiteNoise.start(now);
+    whiteNoise.stop(now + 0.45);
+
+    // 3. Crowd Huuu booing follows explosion
+    setTimeout(() => {
+      this.playBooingSound();
+    }, 450);
+  }
+
   // Authentic "LEWAT" / Pass sound (double felt knock "tok-tok" + subtle skip whoosh)
   public playPass(): void {
     if (!this.enabled) return;

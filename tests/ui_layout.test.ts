@@ -6,6 +6,7 @@ import { ActionPanel } from '../src/client/src/components/ActionPanel.js';
 import { PlayerSeat } from '../src/client/src/components/PlayerSeat.js';
 import { CenterTable } from '../src/client/src/components/CenterTable.js';
 import { BooingBanner } from '../src/client/src/components/BooingBanner.js';
+import { BongExplosionBanner } from '../src/client/src/components/BongExplosionBanner.js';
 import { GameOverModal } from '../src/client/src/components/GameOverModal.js';
 import { PlayingCard } from '../src/client/src/components/PlayingCard.js';
 import { Card, GameState, Player, POKER_JAWA_RULES, GameResult } from '../src/shared/types.js';
@@ -1315,6 +1316,52 @@ describe('UI Layout & Non-Overlapping Elements', () => {
       const fs = await import('fs');
       const appContent = fs.readFileSync('src/client/src/App.tsx', 'utf-8');
       expect(appContent).toContain('w-full flex-1 overflow-y-auto safe-area-full');
+    });
+
+    it('renders BongExplosionBanner with explosive header and tongkrongan text', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(BongExplosionBanner, {
+          bongLossInfo: {
+            victimPlayerId: 'p1',
+            victimName: 'Budi',
+            bomberPlayerId: 'p2',
+            bomberName: 'Siti',
+            bongType: 'BONG_FOUR',
+            bongDescription: 'Bong 4 of a Kind (10)'
+          },
+          myPlayerId: 'p1',
+          onDismiss: () => {}
+        })
+      );
+
+      expect(html).toContain('KENA BONG!');
+      expect(html).toContain('HUUUUU! KAMU KENA BONG!');
+      expect(html).toContain('Langsung Modar / Kalah Telak!');
+      expect(html).toContain('Budi');
+      expect(html).toContain('Siti');
+      expect(html).toContain('Bong 4 of a Kind (10)');
+      expect(html).toContain('Ledakkan &amp; Soraki Huu Lagi!');
+    });
+
+    it('renders PokerTable with floating minimal header (height max 36px, transparent backdrop)', async () => {
+      const { PokerTable } = await import('../src/client/src/components/PokerTable.js');
+      const html = renderToStaticMarkup(
+        React.createElement(PokerTable, {
+          gameState: sharedMockGameState,
+          myPlayerId: 'me',
+          onPlayCards: () => {},
+          onPassTurn: () => {},
+          onStartGame: () => {},
+          onLeaveRoom: () => {},
+          onOpenRules: () => {},
+          errorMessage: null,
+          onClearError: () => {}
+        })
+      );
+
+      // Minimal floating header
+      expect(html).toContain('max-h-[36px] landscape:max-h-[34px]');
+      expect(html).toContain('bg-transparent border-b-0');
     });
   });
 });

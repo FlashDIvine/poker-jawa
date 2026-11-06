@@ -69,6 +69,7 @@ export interface GameRules {
   deckCount: 1;                         // Strictly 1 dek (52 kartu) selalu
   discardThrees?: boolean;              // Di awal game semua angka 3 dibuang dan pemegang 3 Waru (3♠) jalan duluan
   holdingPokerAsLastCardLoses?: boolean; // Pemegang kartu 2 (Poker) sebagai kartu terakhir langsung kalah telak dan pemain lain langsung menang
+  pokerCutByBongLoses?: boolean;        // Aturan Tongkrongan: Pemain buang kartu 2 (Satuan/Pair) lalu dipotong BONG langsung kalah telak seketika
   allowHints?: boolean;                 // Izinkan tombol saran kombinasi (Hint)
 }
 
@@ -95,6 +96,7 @@ export const DEFAULT_RULES: GameRules = {
   deckCount: 1,
   discardThrees: true,
   holdingPokerAsLastCardLoses: true,
+  pokerCutByBongLoses: true,
   allowHints: true
 };
 
@@ -121,6 +123,7 @@ export const POKER_JAWA_RULES: GameRules = {
   deckCount: 1,
   discardThrees: false,
   holdingPokerAsLastCardLoses: true,
+  pokerCutByBongLoses: true,
   allowHints: true
 };
 
@@ -150,6 +153,15 @@ export interface Player {
 
 export type GameStatus = 'waiting' | 'dealing' | 'playing' | 'round_over' | 'game_over';
 
+export interface BongLossInfo {
+  victimPlayerId: string;
+  victimName: string;
+  bomberPlayerId: string;
+  bomberName: string;
+  bongType: ComboType;
+  bongDescription: string;
+}
+
 export interface GameResult {
   playerId: string;
   playerName: string;
@@ -161,6 +173,8 @@ export interface GameResult {
   isWinner: boolean;
   caughtHoldingPoker?: boolean; // True jika masih memegang kartu poker (angka 2) di akhir game
   pokerCardsCount?: number;     // Jumlah kartu poker yang masih dipegang
+  lostByBongCut?: boolean;      // True jika kalah instan karena kartu 2 dipotong BONG
+  bombedByPlayerId?: string;    // ID pemain yang mengeksekusi BONG
 }
 
 export interface GameState {
@@ -185,6 +199,7 @@ export interface GameState {
   results: GameResult[] | null;
   hasPokerBooing?: boolean;     // True jika ada pemain yang disoraki huuu karena memegang kartu poker di akhir game
   pokerLoserNames?: string[];   // Nama pemain-pemain yang disoraki huuu
+  bongLossInfo?: BongLossInfo | null; // Data detail kekalahan instan akibat kartu 2 dipotong BONG
 }
 
 export interface ChatMessage {

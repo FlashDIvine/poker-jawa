@@ -456,15 +456,17 @@ export function decideBotMove(
     if (pokerCounter) return pokerCounter.cards;
   }
 
-  // If table is Single Poker (2, rank 15) and we have Bong, Tris, or Full House
-  if (lastPlay.combo.mainRank === 15 && lastPlay.combo.type === 'SINGLE') {
-    const bong = candidateCombos.find(c => c.type === 'BONG_FOUR' || c.type === 'BONG_SF' || c.type === 'STRAIGHT_FLUSH');
+  // If table is Single or Pair Poker (2, rank 15) and we have Bong, Tris, or Full House
+  if (lastPlay.combo.mainRank === 15 && (lastPlay.combo.type === 'SINGLE' || lastPlay.combo.type === 'PAIR')) {
+    const bong = candidateCombos.find(c => c.type === 'BONG_FOUR' || c.type === 'BONG_SF' || c.type === 'STRAIGHT_FLUSH' || c.type === 'ROYAL_FLUSH');
     if (bong) {
       return bong.cards;
     }
-    const trisOrFH = candidateCombos.find(c => c.type === 'TRIS' || c.type === 'FULL_HOUSE');
-    if (trisOrFH) {
-      return trisOrFH.cards;
+    if (lastPlay.combo.type === 'SINGLE') {
+      const trisOrFH = candidateCombos.find(c => c.type === 'TRIS' || c.type === 'FULL_HOUSE');
+      if (trisOrFH) {
+        return trisOrFH.cards;
+      }
     }
   }
 

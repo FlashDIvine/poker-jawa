@@ -5,6 +5,7 @@ import { CenterTable, DISCARDED_THREES } from './CenterTable.js';
 import { PlayingCard } from './PlayingCard.js';
 import { ActionPanel } from './ActionPanel.js';
 import { BooingBanner } from './BooingBanner.js';
+import { BongExplosionBanner } from './BongExplosionBanner.js';
 import { sortCards } from '@shared/deck.js';
 import { Copy, Check, Play, BookOpen, LogOut, Volume2, VolumeX, ShieldAlert, Maximize, Minimize, MessageSquare } from 'lucide-react';
 import { sounds } from '../audio/soundEffects.js';
@@ -53,6 +54,15 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   const [discardStep, setDiscardStep] = useState(4);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hintsEnabled, setHintsEnabled] = useState(gameState.rules?.allowHints !== false);
+  const [isScreenShaking, setIsScreenShaking] = useState(false);
+
+  useEffect(() => {
+    if (gameState.bongLossInfo) {
+      setIsScreenShaking(true);
+      const timer = setTimeout(() => setIsScreenShaking(false), 700);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.bongLossInfo]);
 
   useEffect(() => {
     const handleFsChange = () => {
@@ -384,19 +394,19 @@ export const PokerTable: React.FC<PokerTableProps> = ({
 
   return (
     <div className="w-full min-h-[100dvh] h-[100dvh] flex flex-col justify-between bg-slate-950 text-slate-100 select-none overscroll-y-none pb-0.5 sm:pb-4 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]">
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 w-full max-w-6xl mx-auto px-1.5 sm:px-4 py-1 sm:py-2.5 landscape:py-0.5 pt-[max(0.375rem,env(safe-area-inset-top,0px))] pl-[max(0.375rem,env(safe-area-inset-left,0px))] pr-[max(0.375rem,env(safe-area-inset-right,0px))] flex items-center justify-between shrink-0 z-20 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur-sm">
-        {/* Room Info & Code Badge */}
-        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+      {/* Top Floating Minimalist Header (HUD Overlay, Max Height 32px-36px, Safe Area Integrated) */}
+      <header className="sticky top-0 w-full max-w-6xl mx-auto px-1.5 sm:px-4 py-0.5 landscape:py-0 pt-[max(0.375rem,env(safe-area-inset-top,0px))] pl-[max(0.375rem,env(safe-area-inset-left,0px))] pr-[max(0.375rem,env(safe-area-inset-right,0px))] flex items-center justify-between shrink-0 z-20 bg-transparent border-b-0 max-h-[36px] landscape:max-h-[34px]">
+        {/* Left Cluster: Room Info Pill */}
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <button
             onClick={onLeaveRoom}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all cursor-pointer shrink-0"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl bg-slate-900/70 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-700/60 backdrop-blur-md transition-all cursor-pointer shrink-0 shadow-sm"
             title="Tinggalkan Meja"
           >
             <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
-          <div className="min-w-0">
+          <div className="min-w-0 bg-slate-900/70 border border-slate-700/60 rounded-xl px-2 py-0.5 backdrop-blur-md shadow-sm">
             <div className="flex items-center gap-1 sm:gap-2">
               <span className="font-bold text-xs sm:text-base text-slate-200 truncate max-w-[95px] xs:max-w-[140px] sm:max-w-xs">
                 {gameState.roomName}
@@ -422,7 +432,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 bg-slate-900/70 border border-slate-700/60 rounded-xl p-0.5 backdrop-blur-md shadow-sm">
           {/* Chat Trigger (Non-overlapping Header Integration) */}
           {onToggleChat && (
             <button
@@ -510,8 +520,17 @@ export const PokerTable: React.FC<PokerTableProps> = ({
         </div>
       )}
 
-      {/* Floating Booing "Huuuuuu!" Banner on game over (hidden when game over modal is active) */}
-      {gameState.status === 'game_over' && !isGameOverModalOpen && gameState.hasPokerBooing && gameState.pokerLoserNames && (
+      {/* Dramatic BONG Explosion Banner on instant bong loss */}
+      {gameState.status === 'game_over' && !isGameOverModalOpen && gameState.bongLossInfo && (
+        <BongExplosionBanner
+          bongLossInfo={gameState.bongLossInfo}
+          myPlayerId={myPlayerId}
+          onDismiss={onDismissBooing}
+        />
+      )}
+
+      {/* Floating Booing "Huuuuuu!" Banner on game over (hidden when game over modal is active or bong loss active) */}
+      {gameState.status === 'game_over' && !isGameOverModalOpen && !gameState.bongLossInfo && gameState.hasPokerBooing && gameState.pokerLoserNames && (
         <BooingBanner
           loserNames={gameState.pokerLoserNames}
           isSelfLoser={Boolean(gameState.results?.find(r => r.playerId === me?.id)?.caughtHoldingPoker)}
@@ -520,7 +539,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
       )}
 
       {/* Main Felt Casino Table Area */}
-      <main className="w-full max-w-6xl mx-auto px-1 sm:px-3 flex-1 min-h-0 flex flex-col justify-center my-0 sm:my-1">
+      <main className={`w-full max-w-6xl mx-auto px-1 sm:px-3 flex-1 min-h-0 flex flex-col justify-center my-0 sm:my-1 ${isScreenShaking ? 'animate-screen-shake' : ''}`}>
         {/* Top Seats Exterior (Opponents outside green felt table) - Safe clearance from header */}
         {topOpponents.length > 0 && (
           <div className="w-full flex justify-center items-center gap-1 sm:gap-3 z-10 flex-wrap pt-2.5 sm:pt-3.5 pb-0.5 landscape:pt-1.5 landscape:pb-0 min-h-[32px] sm:min-h-[48px] shrink-0">
