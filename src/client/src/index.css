@@ -600,6 +600,26 @@
   }
 }
 
+/* Smartphone Landscape Viewports (height <= 440px, e.g. 360px - 414px mobile devices) */
+@media (orientation: landscape) and (max-height: 440px) {
+  .felt-border-mobile-landscape {
+    border-radius: 56px !important;
+    padding: 2.5px !important;
+    width: 66% !important;
+    max-width: min(68vw, 540px) !important;
+    min-width: min(60vw, 380px) !important;
+    flex-shrink: 0 !important;
+  }
+
+  .felt-table-mobile-landscape {
+    border-radius: 52px !important;
+    padding: 0.2rem 0.45rem !important;
+    min-height: 106px !important;
+    max-height: 128px !important;
+    width: 100% !important;
+  }
+}
+
 /* Mobile Portrait Optimizations (narrow screens) */
 @media (max-width: 480px) and (orientation: portrait) {
   .card-selected {

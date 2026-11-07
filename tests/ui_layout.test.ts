@@ -1363,6 +1363,71 @@ describe('UI Layout & Non-Overlapping Elements', () => {
       expect(html).toContain('max-h-[36px] landscape:max-h-[34px]');
       expect(html).toContain('bg-transparent border-b-0');
     });
+
+    it('verifies smartphone landscape optimizations (height <= 440px) in index.css and PokerTable.tsx', async () => {
+      const fs = await import('fs');
+      const css = fs.readFileSync('src/client/src/index.css', 'utf-8');
+
+      // Smartphone landscape media query
+      expect(css).toContain('@media (orientation: landscape) and (max-height: 440px)');
+      expect(css).toContain('width: 66% !important;');
+      expect(css).toContain('min-height: 106px !important;');
+      expect(css).toContain('max-height: 128px !important;');
+      expect(css).toContain('border-radius: 56px !important;');
+      expect(css).toContain('border-radius: 52px !important;');
+
+      const { PokerTable } = await import('../src/client/src/components/PokerTable.js');
+      const html = renderToStaticMarkup(
+        React.createElement(PokerTable, {
+          gameState: sharedMockGameState,
+          myPlayerId: 'me',
+          onPlayCards: () => {},
+          onPassTurn: () => {},
+          onStartGame: () => {},
+          onLeaveRoom: () => {},
+          onOpenRules: () => {},
+          errorMessage: null,
+          onClearError: () => {}
+        })
+      );
+
+      // Main layout starts from top on landscape to avoid pushing top seat under header
+      expect(html).toContain('landscape:justify-start landscape:gap-0.5');
+      // Top seats safe clearance
+      expect(html).toContain('landscape:pt-0.5 landscape:pb-0');
+    });
+
+    it('verifies balanced dual-thumb action bar in ActionPanel.tsx with Saran, Sort, Pass and Play', () => {
+      const handWithPair: Card[] = [
+        { id: 'c1', rank: 5, suit: 'S', rankLabel: '5', suitSymbol: '♠', suitName: 'Waru', suitValue: 1, color: 'black', isPoker: false, isAce: false, isThreeSpades: false },
+        { id: 'c2', rank: 5, suit: 'H', rankLabel: '5', suitSymbol: '♥', suitName: 'Hati', suitValue: 4, color: 'red', isPoker: false, isAce: false, isThreeSpades: false }
+      ];
+
+      const html = renderToStaticMarkup(
+        React.createElement(ActionPanel, {
+          hand: handWithPair,
+          selectedCardIds: ['c1'],
+          onToggleCard: () => {},
+          onSelectCards: () => {},
+          onClearSelection: () => {},
+          onPlaySelected: () => {},
+          onPass: () => {},
+          onSortToggle: () => {},
+          sortMode: 'rank',
+          isMyTurn: true,
+          lastPlay: null,
+          isFirstTurnOfGame: false
+        })
+      );
+
+      // Action bar has both left thumb cluster (Saran, Sort) and right thumb cluster (Pass, Play)
+      expect(html).toContain('Saran');
+      expect(html).toContain('Angka');
+      expect(html).toContain('Lewat');
+      expect(html).toContain('Keluarkan');
+      // Selection feedback combo description
+      expect(html).toContain('Satuan 5♠');
+    });
   });
 });
 

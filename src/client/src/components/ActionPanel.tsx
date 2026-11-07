@@ -426,7 +426,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           </div>
         )}
 
-        {/* Floating Utility Cluster: Combo Chips + Saran (Hint) + 123 (Sort) */}
+        {/* Floating Utility Cluster: Combo Chips */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 mx-auto flex-1 min-w-0 justify-end">
           {/* Quick Combo Scrollable Chips */}
           {comboOptions.filter(opt => opt.count > 0).map(opt => (
@@ -446,45 +446,6 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
               </span>
             </button>
           ))}
-
-          {/* Suggestion / Hint Button (Floating Slim Utility above hand) */}
-          {rules?.allowHints !== false && (
-            hintsEnabled ? (
-              <button
-                onClick={handleAutoHint}
-                disabled={!player?.isAutoPlay && !isMyTurn}
-                className={`shrink-0 flex items-center justify-center gap-1 min-h-[40px] sm:min-h-[44px] px-2 sm:px-2.5 py-1 sm:py-1 rounded-lg font-semibold text-[10px] sm:text-xs transition-all active:scale-95 ${
-                  player?.isAutoPlay || isMyTurn
-                    ? 'bg-indigo-900/90 hover:bg-indigo-800 text-indigo-200 border border-indigo-500/50 shadow cursor-pointer ring-1 ring-indigo-400/40'
-                    : 'bg-slate-800/60 text-slate-600 border border-slate-800 cursor-not-allowed'
-                }`}
-                title="Beri saran kombinasi yang bisa dikeluarkan"
-              >
-                <Lightbulb className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-300 shrink-0" />
-                <span className="hidden xs:inline">Saran</span>
-              </button>
-            ) : onToggleHints ? (
-              <button
-                onClick={onToggleHints}
-                className="shrink-0 flex items-center justify-center gap-1 min-h-[40px] sm:min-h-[44px] px-2 py-1 rounded-lg font-medium text-[10px] sm:text-xs bg-slate-900 hover:bg-slate-800 text-slate-500 border border-slate-700/80 cursor-pointer transition-all active:scale-95"
-                title="Mode Tanpa Saran aktif. Klik untuk nyalakan bantuan saran."
-              >
-                <Lightbulb className="w-3 h-3 text-slate-600 shrink-0" />
-                <span className="text-[10px] text-slate-400">Off</span>
-              </button>
-            ) : null
-          )}
-
-          {/* Sort Button (Floating Slim Utility above hand) */}
-          <button
-            onClick={handleSortClick}
-            className="shrink-0 flex items-center justify-center gap-1 min-h-[40px] sm:min-h-[44px] min-w-[36px] sm:min-w-[44px] px-2 sm:px-2.5 py-1 rounded-lg font-semibold text-[10px] sm:text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow cursor-pointer transition-all active:scale-95"
-            title="Ubah urutan kartu"
-          >
-            <ArrowUpDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
-            <span className="hidden sm:inline">{sortMode === 'rank' ? 'Angka' : 'Kembang'}</span>
-            <span className="sm:hidden text-[10px]">{sortMode === 'rank' ? '123' : '♠♥'}</span>
-          </button>
         </div>
       </div>
 
@@ -570,13 +531,53 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       </div>
 
 
-      {/* Ergonomic Dedicated Floating Action Bar (Transparent HUD Floating Hand) */}
+      {/* Ergonomic Dedicated Floating Action Bar (Balanced Dual-Thumb Controls) */}
       <div className="relative w-full flex items-center justify-between gap-1 sm:gap-2.5 py-1 sm:py-1.5 px-1.5 sm:px-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] pl-[max(0.375rem,env(safe-area-inset-left,0px))] pr-[max(0.375rem,env(safe-area-inset-right,0px))] z-30 max-w-4xl shrink-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent sm:bg-slate-900/40 backdrop-blur-xs rounded-t-2xl sm:rounded-2xl border-t border-slate-700/60 sm:border border-slate-700/40 shadow-xl mt-0.5">
-        {/* Left Side: Unobtrusive selected card feedback */}
-        <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+        {/* Left Thumb Cluster: Saran (Hint), Sort (123 / Kembang), and Selected Combo Badge */}
+        <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+          {/* Suggestion / Hint Button */}
+          {rules?.allowHints !== false && (
+            hintsEnabled ? (
+              <button
+                onClick={handleAutoHint}
+                disabled={!player?.isAutoPlay && !isMyTurn}
+                className={`flex items-center justify-center gap-1 min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition-all active:scale-95 ${
+                  player?.isAutoPlay || isMyTurn
+                    ? 'bg-indigo-900/90 hover:bg-indigo-800 text-indigo-200 border border-indigo-500/60 shadow cursor-pointer ring-1 ring-indigo-400/40'
+                    : 'bg-slate-800/60 text-slate-600 border border-slate-800 cursor-not-allowed'
+                }`}
+                title="Beri saran kombinasi yang bisa dikeluarkan"
+              >
+                <Lightbulb className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300 shrink-0" />
+                <span className="hidden xs:inline">Saran</span>
+              </button>
+            ) : onToggleHints ? (
+              <button
+                onClick={onToggleHints}
+                className="flex items-center justify-center gap-1 min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-xl font-medium text-xs sm:text-sm bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-700/80 cursor-pointer transition-all active:scale-95"
+                title="Mode Tanpa Saran aktif. Klik untuk nyalakan bantuan saran."
+              >
+                <Lightbulb className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span className="hidden xs:inline text-slate-400">Off</span>
+              </button>
+            ) : null
+          )}
+
+          {/* Sort Button */}
+          <button
+            onClick={handleSortClick}
+            className="flex items-center justify-center gap-1 min-h-[44px] min-w-[44px] px-2 sm:px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow cursor-pointer transition-all active:scale-95"
+            title="Ubah urutan kartu"
+          >
+            <ArrowUpDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+            <span className="hidden sm:inline">{sortMode === 'rank' ? 'Angka' : 'Kembang'}</span>
+            <span className="sm:hidden text-xs">{sortMode === 'rank' ? '123' : '♠♥'}</span>
+          </button>
+
+          {/* Selected Cards Feedback Badge */}
           {selectedCardIds.length > 0 && (
-            <span className="hidden sm:inline-block text-[11px] text-amber-300 font-semibold truncate max-w-[150px]">
-              {validation.valid && validation.combo ? validation.combo.description : `${selectedCardIds.length} kartu dipilih`}
+            <span className="text-[10px] sm:text-[11px] text-amber-300 font-semibold truncate max-w-[85px] xs:max-w-[120px] sm:max-w-[160px] px-1.5 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30">
+              {validation.valid && validation.combo ? validation.combo.description : `${selectedCardIds.length} dipilih`}
             </span>
           )}
         </div>
